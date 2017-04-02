@@ -1,0 +1,15 @@
+{% extends "home.html" %}
+
+{% block header %}<H1>Update algo</H1>{% endblock %}
+{% block content %}
+
+<form action="/update" method="post">
+  <dl>
+
+    {{ render_field(form.campaignID) }}
+    {{ render_field(form.choice) }}
+    {{ render_field(form.DSP) }}
+
+  </dl>
+  <p><input type=submit value=Update>
+{% endblock %}

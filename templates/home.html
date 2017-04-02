@@ -1,0 +1,32 @@
+<HTML xmlns="http://www.w3.org/1999/html">
+<HEAD>
+<TITLE>Josh's web UI</TITLE>
+</HEAD>
+<BODY BGCOLOR="FFFFFF">
+<CENTER><IMG SRC="/static/images/large.jpg" ALIGN="BOTTOM"> </CENTER>
+<HR>
+
+{% block header %}<H1>Update algo</H1>{% endblock %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <p class=flashes>
+    {% for message in messages %}
+      {{ message }}
+    {% endfor %}
+    </p>
+  {% endif %}
+{% endwith %}
+
+{% from "_formhelpers.html" import render_field %}
+
+{% block content %}
+<form action="/update" =post>
+  <dl>
+  </dl>
+  <p><input type=submit value=Update>
+</form>
+{% endblock %}
+<HR>
+</BODY>
+</HTML>

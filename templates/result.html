@@ -1,0 +1,32 @@
+<HTML>
+<HEAD>
+<TITLE>Josh's webby UI</TITLE>
+</HEAD>
+<BODY BGCOLOR="FFFFFF">
+<CENTER><IMG SRC="/static/images/large.jpg" ALIGN="BOTTOM"> </CENTER>
+<HR>
+
+
+<H1>You selected:</H1>
+
+<ul id = "result">
+   {% for value in result.values()[1:4] %}
+   <li>{{ value}}</li>
+    {% endfor %}
+</ul>
+
+<p>Here is a nice table!</p>
+
+<table border = 1>
+   {% for value in result.values()[1:4] %}
+
+      <tr>
+         <td> {{ value }} </td>
+      </tr>
+
+   {% endfor %}
+</table>
+
+<HR>
+</BODY>
+</HTML>
