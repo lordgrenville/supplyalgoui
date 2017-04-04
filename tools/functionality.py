@@ -30,9 +30,10 @@ class userInfo:
         self.campaign_id = None
         self.DSP = None
         self.choice = None
-    def get_info(self, campaign_id,  DSP, choice):
+    def get_info(self, campaign_id,  DSP, choice, choicename):
         self.campaign_id = str(campaign_id)
         self.DSP = str(DSP)
         self.choice = str(choice)
+        self.choicename = choicename
     def get_number(self, bid):
         self.bid = float(bid)

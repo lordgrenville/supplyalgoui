@@ -5,16 +5,20 @@
 <p id="demo">
   The upload was
   {{term}}.
-  <br>Here is the redis info
-
+  <br>
+    <br>
+       The <b>{{choice}}</b> for campaign <b>{{id}}</b> is now <b>{{bid}}</b>.
+    <br>
+        <br>
+    Full list of {{choice}}:
+    <br>
+<br>
     <table>
-{% for key,parent_dict_item in doc.items() %}
-   {% for key2, nested_value in parent_dict_item.items() %}
+{% for key,value in redis.items() %}
     <tr>
-        <th>{{key2}}</th>
-        <td>{{nested_value}}</td>
+        <th>{{key}}</th>
+        <td>{{value}}</td>
     </tr>
-   {% endfor %}
 {% endfor %}
 </table>
 <p>

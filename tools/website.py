@@ -1,7 +1,7 @@
 import random
 from flask import *
-from .forms import RegistrationForm
-from tools.forms import RegistrationForm, BidForm, CapForm, StatusForm
+from .forms import PrimaryForm
+from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
 
 
 class FlaskApp(Flask):
@@ -17,13 +17,13 @@ class FlaskApp(Flask):
 
     @app.route('/')
     def home(self):
-        form = RegistrationForm(request.form)
+        form = PrimaryForm(request.form)
         return render_template('base_home.html', form=form)
 
     @app.route('/update', methods=['GET', 'POST'])
     def update(self):
         print("yotam")
-        form = RegistrationForm(request.form)
+        form = PrimaryForm(request.form)
         form2 = StatusForm(request.form)
         form3 = CapForm(request.form)
         form4 = BidForm(request.form)
@@ -48,7 +48,7 @@ class FlaskApp(Flask):
 
     @app.route('/result', methods=['GET', 'POST'])
     def result(self):
-        form2 = RegistrationForm(request.form)
+        form2 = PrimaryForm(request.form)
         if request.method == 'POST':
             old_redis = self.myfunc.getdoc(self.new_update.DSP)
             if self.new_update.choice == 'Status':
@@ -71,13 +71,13 @@ class FlaskApp(Flask):
 
     # @app.route('/', methods=['GET'])
     # def home(self):
-    #     self.form = RegistrationForm(request.form)
+    #     self.form = PrimaryForm(request.form)
     #     if request.method == 'GET':
     #         return render_template("base_home.html", form=self.form)
     #
     # @app.route('/', methods=['POST', 'GET'])
     # def update(self):
-    #     self.form = RegistrationForm(request.form)
+    #     self.form = PrimaryForm(request.form)
     #     self.cam_id = self.form.campaignID._value()
     #     self.choice = self.form.choice.data
     #     self.choice_name = dict(self.form.choice.choices).get(self.form.choice.data)
