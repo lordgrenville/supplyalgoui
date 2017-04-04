@@ -5,10 +5,19 @@
 <p id="demo">
   The upload was
   {{term}}.
-  <br>
-  <br>
-  Here is the redis info {{doc}}
-</p>
+  <br>Here is the redis info
+
+    <table>
+{% for key,parent_dict_item in doc.items() %}
+   {% for key2, nested_value in parent_dict_item.items() %}
+    <tr>
+        <th>{{key2}}</th>
+        <td>{{nested_value}}</td>
+    </tr>
+   {% endfor %}
+{% endfor %}
+</table>
+<p>
 <IMG SRC={{dog}} ALIGN="BOTTOM">
 
 {% endblock %}

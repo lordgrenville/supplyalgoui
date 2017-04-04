@@ -22,6 +22,9 @@ class Functionality:
         doc = self.mr.Get_doc_by_dsp(dspname.lower())
         return doc
 
+    def setdoc(self, dspname, doc):
+        self.mr.set_doc_by_dsp(dspname.lower(),doc)
+
 class userInfo:
     def __init__(self):
         self.campaign_id = None
@@ -31,5 +34,5 @@ class userInfo:
         self.campaign_id = str(campaign_id)
         self.DSP = str(DSP)
         self.choice = str(choice)
-    def get_bid(self, bid):
+    def get_number(self, bid):
         self.bid = float(bid)
