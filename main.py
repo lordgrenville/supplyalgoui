@@ -101,12 +101,12 @@ def get_app(myfunc,new_update,config_filename):
                     old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
             #upload redis to server, get response, and based on that give either success or failure
-                my_upload = myfunc.setdoc(new_update.DSP, old_redis)
-                if my_upload == sys.exit:
+                try:
+                    myfunc.set_doc_by_dsp(new_update.DSP, old_redis)
                     return render_template("algo_response.html", term="not successful",
                                            dog="/static/images/sad-dog.jpg")
-                else:
-                return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
+                except SystemExit:
+                    return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
                                        choice=new_update.choicename, id=new_update.campaign_id,
                                        bid=old_redis[new_update.choice][new_update.campaign_id],
                                        redis=old_redis[new_update.choice])
