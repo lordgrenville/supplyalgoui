@@ -3,12 +3,20 @@
 {% block header %}<H1>Update algo</H1>{% endblock %}
 {% block content %}
 
-<form action="/update" method="post">
+<form action="/" method="post">
   <dl>
 
-    {{ render_field(form.campaignID) }}
-    {{ render_field(form.choice) }}
-    {{ render_field(form.dsp) }}
+    {% if request.method == 'POST'%}
+
+        {{render_field(choice)}}
+
+    {%else %}
+
+        {{ render_field(form.campaignID) }}
+        {{ render_field(form.choice) }}
+        {{ render_field(form.dsp) }}
+
+    {% endif %}
 
   </dl>
   <p><input type=submit value=Update>

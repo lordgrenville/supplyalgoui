@@ -32,75 +32,77 @@ def get_app(myfunc, new_update, config_filename):
     app.config['SECRET_KEY'] = 'bx85EMx91xbf~8x8bxb3xfc!xe1xedxb6*xdeMxd7xeax06x9exda_'
 
     # home view
-    @app.route('/')
+    @app.route('/', methods=['GET', 'POST'])
     def home():
         form = PrimaryForm(request.form)
-        return render_template('base_home.html', form=form)
 
-    # second view - the update view. this is one of three forms
-    @app.route('/update', methods=['GET', 'POST'])
-    def update():
-        form = PrimaryForm(request.form)
-        form2 = StatusForm(request.form)
-        form3 = CapForm(request.form)
-        form4 = BidForm(request.form)
-
-        # if the form validates, go to one of three update views
-        if request.method == 'POST' and form.validate():
-            flash('Your campaign ID is valid.')
-            choice_name = dict(form.choice.choices).get(form.choice.data)
-            new_update.get_info(form.campaignID._value(), form.dsp.data, form.choice.data, choice_name)
-            myfunc.printargs(new_update.campaign_id)
-            myfunc.printargs(new_update.choice)
-            myfunc.printargs(new_update.DSP)
-            if new_update.choice == "status":
-                return render_template("status_home.html", form=form2, choice=choice_name, DSP=new_update.DSP,
-                                       cam_id=new_update.campaign_id)
-            elif new_update.choice == "frequency_cap":
-                return render_template("cap_home.html", form=form3, choice=choice_name, DSP=new_update.DSP,
-                                       cam_id=new_update.campaign_id)
-            else:
-                return render_template("bid_home.html", form=form4, choice=choice_name, DSP=new_update.DSP,
-                                       cam_id=new_update.campaign_id)
-
-        # if all else fails, go to the beginning view
-        else:
+        if request.method == 'GET':
             return render_template('base_home.html', form=form)
 
-    # third view is result - we will tell the user if the Db has been successfully updated or not
-    @app.route('/result', methods=['GET', 'POST'])
-    def result():
+        else:  # if method == POST
 
-        # initialise forms
-        form = PrimaryForm(request.form)
-        form2 = StatusForm(request.form)
-        form3 = CapForm(request.form)
-        form4 = BidForm(request.form)
+            if new_update.choice == None:  # if this is the first round
 
-        if request.method == 'POST':
+                if form.validate():
+                    choice_name = dict(form.choice.choices).get(form.choice.data)
+                    new_update.get_info(form.campaignID._value(), form.dsp.data, form.choice.data, choice_name)
+                    myfunc.printargs(new_update.campaign_id)
+                    myfunc.printargs(new_update.choice)
+                    myfunc.printargs(new_update.DSP)
 
-            # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
-            old_redis = myfunc.getdoc(new_update.DSP)
+                    message = Markup('Your campaign ID is valid.You are updating the %s for %s Campaign: <b>%s</b>') % \
+                              (choice_name, new_update.DSP, new_update.campaign_id)
+                    flash(message)
 
-            # handle invalid input
-            if not form3.validate() or not form4.validate():
-                flash(
-                    'Sorry, your response wasn\'t valid. Make sure that your bid or cap are in number form only (e.g.: 3.15 or 2). Please begin the process again')
-                return render_template("base_home.html", form=form)
+                    if new_update.choice == "status":
+                        form2 = StatusForm(request.form)
+                        choice = form2.status
+                    elif new_update.choice == "frequency_cap":
+                        form2 = CapForm(request.form)
+                        choice = form2.frequency_cap
+                    else:
+                        form2 = BidForm(request.form)
+                        choice = form2.bid
+                    return render_template('base_home.html', form=form2, choice=choice)
+
+                else:
+                    flash('There was an issue with your input. Please try again.')
+                    return render_template("base_home.html", form=form)
 
             else:
+                # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
+                old_redis = myfunc.getdoc(new_update.DSP)
+                data = request.form.to_dict()
+                # validate forms!
                 if new_update.choice == 'status':
-                    if form2.data['status'] == 'Activated':
+
+                    my_status = data['status']
+                    if my_status == 'Activated':
                         old_redis['status'][new_update.campaign_id] = 1.0
                     else:
                         old_redis['status'][new_update.campaign_id] = 0.0
 
                 elif new_update.choice == 'frequency_cap':
-                    new_update.get_number(form3.data['frequency_cap'])
+                    my_cap = data['frequency_cap']
+                    new_update.get_number(my_cap)
                     old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
 
-                elif new_update.choice == 'lowerbid' or new_update.choice == 'maxbid' or new_update.choice == 'bid':
-                    new_update.get_number(form4.data['bid'])
+                elif new_update.choice == 'lowerbid':
+
+                    my_bid = data['lowerbid']
+                    new_update.get_number(my_bid)
+                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+
+                elif new_update.choice == 'maxbid':
+
+                    my_bid = data['maxbid']
+                    new_update.get_number(my_bid)
+                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+
+                elif new_update.choice == 'bid':
+
+                    my_bid = data['bid']
+                    new_update.get_number(my_bid)
                     old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
                 return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
@@ -108,7 +110,7 @@ def get_app(myfunc, new_update, config_filename):
                                        bid=old_redis[new_update.choice][new_update.campaign_id],
                                        redis=old_redis[new_update.choice])
 
-    app.debug = False
+    app.debug = True
     return app
 
 
