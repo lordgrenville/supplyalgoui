@@ -37,15 +37,16 @@ def get_app(myfunc, new_update, config_filename):
         form = PrimaryForm(request.form)
 
         if request.method == 'GET':
-            return render_template('base_home.html', form=form)
+            return render_template('base_home.html', form=form, step="a")
 
         else:  # if method == POST
 
-            if new_update.choice == None:  # if this is the first round
+            if len(request.form) == 3:  # if this is the first round
 
                 if form.validate():
                     choice_name = dict(form.choice.choices).get(form.choice.data)
-                    new_update.get_info(form.campaignID._value(), form.dsp.data, form.choice.data, choice_name)
+                    new_update.get_info(form.campaignID.data.strip(), form.dsp.data, form.choice.data, choice_name)
+                    # the .strip() removes trailing spaces
                     myfunc.printargs(new_update.campaign_id)
                     myfunc.printargs(new_update.choice)
                     myfunc.printargs(new_update.DSP)
@@ -63,52 +64,63 @@ def get_app(myfunc, new_update, config_filename):
                     else:
                         form2 = BidForm(request.form)
                         choice = form2.bid
-                    return render_template('base_home.html', form=form2, choice=choice)
+                    return render_template('base_home.html', form=form2, step="b")
 
                 else:
                     flash('There was an issue with your input. Please try again.')
-                    return render_template("base_home.html", form=form)
+                    return render_template("base_home.html", form=form, step="a")
 
             else:
                 # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
                 old_redis = myfunc.getdoc(new_update.DSP)
                 data = request.form.to_dict()
+
+                if new_update.campaign_id not in old_redis[new_update.choice]:
+                    flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
+                          "of your parameters and try again.")
+                    return render_template("base_home.html", form=form, step="a")
+
+                else:
                 # validate forms!
-                if new_update.choice == 'status':
+                    if new_update.choice == 'status':
 
-                    my_status = data['status']
-                    if my_status == 'Activated':
-                        old_redis['status'][new_update.campaign_id] = 1.0
+                        my_status = data['status']
+                        if my_status == 'Activated':
+                            old_redis['status'][new_update.campaign_id] = 1.0
+                        else:
+                            old_redis['status'][new_update.campaign_id] = 0.0
+
+                    elif new_update.choice == 'frequency_cap':
+                        my_cap = data['frequency_cap']
+                        new_update.get_number(my_cap)
+                        old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+
                     else:
-                        old_redis['status'][new_update.campaign_id] = 0.0
+                        my_bid = data['bid']
 
-                elif new_update.choice == 'frequency_cap':
-                    my_cap = data['frequency_cap']
-                    new_update.get_number(my_cap)
-                    old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+                        try:
+                            float(my_bid)
 
-                elif new_update.choice == 'lowerbid':
+                            if new_update.choice == 'lowerbid':
+                                new_update.get_number(my_bid)
+                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                    my_bid = data['lowerbid']
-                    new_update.get_number(my_bid)
-                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+                            elif new_update.choice == 'maxbid':
+                                new_update.get_number(my_bid)
+                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                elif new_update.choice == 'maxbid':
+                            elif new_update.choice == 'bid':
+                                new_update.get_number(my_bid)
+                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                    my_bid = data['maxbid']
-                    new_update.get_number(my_bid)
-                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+                        except ValueError:
+                            flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                            return render_template("base_home.html", form=form, step=0)
 
-                elif new_update.choice == 'bid':
-
-                    my_bid = data['bid']
-                    new_update.get_number(my_bid)
-                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
-                                       choice=new_update.choicename, id=new_update.campaign_id,
-                                       bid=old_redis[new_update.choice][new_update.campaign_id],
-                                       redis=old_redis[new_update.choice])
+                        return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
+                                               choice=new_update.choicename, id=new_update.campaign_id,
+                                               bid=old_redis[new_update.choice][new_update.campaign_id],
+                                               redis=old_redis[new_update.choice])
 
     app.debug = True
     return app
