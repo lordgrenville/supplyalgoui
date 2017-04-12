@@ -64,7 +64,7 @@ def get_app(myfunc, new_update, config_filename):
                     else:
                         form2 = BidForm(request.form)
                         choice = form2.bid
-                    return render_template('base_home.html', form=form2, step="b")
+                    return render_template('base_home.html', choice=choice, step="b")
 
                 else:
                     flash('There was an issue with your input. Please try again.')
