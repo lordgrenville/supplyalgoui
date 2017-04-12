@@ -37,7 +37,7 @@ def get_app(myfunc, new_update, config_filename):
         form = PrimaryForm(request.form)
 
         if request.method == 'GET':
-            return render_template('base_home.html', form=form, step="a")
+            return render_template('base_home.html', form=form, step=0)
 
         else:  # if method == POST
 
@@ -64,11 +64,11 @@ def get_app(myfunc, new_update, config_filename):
                     else:
                         form2 = BidForm(request.form)
                         choice = form2.bid
-                    return render_template('base_home.html', choice=choice, step="b")
+                    return render_template('base_home.html', choice=choice, step=1)
 
                 else:
                     flash('There was an issue with your input. Please try again.')
-                    return render_template("base_home.html", form=form, step="a")
+                    return render_template("base_home.html", form=form, step=0)
 
             else:
                 # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
@@ -77,8 +77,8 @@ def get_app(myfunc, new_update, config_filename):
 
                 if new_update.campaign_id not in old_redis[new_update.choice]:
                     flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
-                          "of your parameters and try again.")
-                    return render_template("base_home.html", form=form, step="a")
+                          " of your parameters and try again.")
+                    return render_template("base_home.html", form=form, step=0)
 
                 else:
                 # validate forms!
@@ -92,8 +92,18 @@ def get_app(myfunc, new_update, config_filename):
 
                     elif new_update.choice == 'frequency_cap':
                         my_cap = data['frequency_cap']
-                        new_update.get_number(my_cap)
-                        old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+                        try:
+                            float(my_cap)
+                            new_update.get_number(my_cap)
+                            old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+
+                        #recreate the bid form
+                        except:
+                            ValueError
+                            form2 = CapForm(request.form)
+                            choice = form2.frequency_cap
+                            flash("Sorry, the cap you enter must be in integer form, e,g, 3")
+                            return render_template("base_home.html", choice=choice, step=1)
 
                     else:
                         my_bid = data['bid']
@@ -114,10 +124,12 @@ def get_app(myfunc, new_update, config_filename):
                                 old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
                         except ValueError:
+                            form2 = BidForm(request.form)
+                            choice=form2.bid
                             flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
-                            return render_template("base_home.html", form=form, step=0)
+                            return render_template("base_home.html", choice=choice, step=1)
 
-                        return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
+                    return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
                                                choice=new_update.choicename, id=new_update.campaign_id,
                                                bid=old_redis[new_update.choice][new_update.campaign_id],
                                                redis=old_redis[new_update.choice])

@@ -5,10 +5,10 @@ class PrimaryForm(Form):
     dsp = SelectField('DSP',choices=[('Nuviad', 'Nuviad'),('Pocket', 'Pocket')])
 
 class BidForm(Form):
-    bid = DecimalField('Bid', places=2)
+    bid = StringField('Bid')
 
 class CapForm(Form):
-    frequency_cap = IntegerField('Cap',[validators.MyValidator()])
+    frequency_cap = IntegerField('Cap')
 
 class StatusForm(Form):
     status = SelectField('Status', choices=[('Activated', 'Activated'),('Paused', 'Paused')])
