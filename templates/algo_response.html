@@ -6,21 +6,30 @@
   The upload was
   {{term}}.
   <br>
-    <br>
-       The <b>{{choice}}</b> for campaign <b>{{id}}</b> is now <b>{{bid}}</b>.
-    <br>
+      {% if success == True %}
+
         <br>
-    Full list of {{choice}}:
-    <br>
-<br>
-    <table>
-{% for key,value in redis.items() %}
-    <tr>
-        <th>{{key}}</th>
-        <td>{{value}}</td>
-    </tr>
-{% endfor %}
-</table>
+        The <b>{{choice}}</b> for campaign <b>{{id}}</b> is now <b>{{bid}}</b>.
+        <br>
+        <br>
+        Full list of {{choice}}:
+        <br>
+        <br>
+        <table>
+            {% for key,value in redis.items() %}
+                <tr>
+                    <th>{{key}}</th>
+                    <td>{{value}}</td>
+                </tr>
+            {% endfor %}
+        </table>
+
+    {%else %}
+
+        All information in the algorithm remains the same.
+
+    {% endif %}
+
 <p>
 <IMG SRC={{dog}} ALIGN="BOTTOM">
 

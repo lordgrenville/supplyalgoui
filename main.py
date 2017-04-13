@@ -129,10 +129,17 @@ def get_app(myfunc, new_update, config_filename):
                             flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                             return render_template("base_home.html", choice=choice, step=1)
 
-                    return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
+                    try:
+                        myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
+                        return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
                                                choice=new_update.choicename, id=new_update.campaign_id,
                                                bid=old_redis[new_update.choice][new_update.campaign_id],
                                                redis=old_redis[new_update.choice])
+                    except:
+                        SystemExit
+                        return render_template("algo_response.html", term="unsuccessful. The value remains the same",
+                                               dog="/static/images/sad-dog.jpg")
+
 
     app.debug = True
     return app
