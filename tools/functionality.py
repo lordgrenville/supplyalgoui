@@ -37,3 +37,5 @@ class userInfo:
         self.choicename = choicename
     def get_number(self, bid):
         self.bid = float(bid)
+    def get_oldvalue(self, value):
+        self.oldvalue = value

@@ -6,13 +6,16 @@
   The upload was
   {{term}}.
   <br>
-      {% if success == True %}
+      {% if term == "successful" %}
 
         <br>
-        The <b>{{choice}}</b> for campaign <b>{{id}}</b> is now <b>{{bid}}</b>.
+        The <b>{{choice}}</b> for campaign <b>{{id}}</b> has been changed to <b>{{bid}}</b> (from <b>{{oldbid}}</b>).
         <br>
         <br>
-        Full list of {{choice}}:
+        All other information in the algorithm remains the same.
+        <br>
+        <br>
+        Full list of {{choice}} for {{DSP}}:
         <br>
         <br>
         <table>
@@ -27,10 +30,10 @@
     {%else %}
 
         All information in the algorithm remains the same.
-
+        <IMG SRC={{dog}} ALIGN="BOTTOM">
     {% endif %}
 
 <p>
-<IMG SRC={{dog}} ALIGN="BOTTOM">
+
 
 {% endblock %}

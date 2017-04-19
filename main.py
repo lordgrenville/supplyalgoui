@@ -36,7 +36,7 @@ def get_app(myfunc, new_update, config_filename):
     def home():
         form = PrimaryForm(request.form)
 
-        if request.method == 'GET':
+        if not request.method == 'POST':
             return render_template('base_home.html', form=form, step=0)
 
         else:  # if method == POST
@@ -84,10 +84,20 @@ def get_app(myfunc, new_update, config_filename):
                 # validate forms!
                     if new_update.choice == 'status':
 
+                        #store the old value
                         my_status = data['status']
+                        if old_redis['status'][new_update.campaign_id] == 1.0:
+                            old_status = "Activated"
+                        else:
+                            old_status = "Paused"
+                        new_update.get_oldvalue(old_status)
+
+                        #update the redis over here
                         if my_status == 'Activated':
+                            new_update.get_number(1.0)
                             old_redis['status'][new_update.campaign_id] = 1.0
                         else:
+                            new_update.get_number(0.0)
                             old_redis['status'][new_update.campaign_id] = 0.0
 
                     elif new_update.choice == 'frequency_cap':
@@ -95,6 +105,11 @@ def get_app(myfunc, new_update, config_filename):
                         try:
                             float(my_cap)
                             new_update.get_number(my_cap)
+                            #store the old value
+                            old_cap = old_redis['frequency_cap'][new_update.campaign_id]
+                            new_update.get_oldvalue(old_cap)
+
+                            #update the new value
                             old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
 
                         #recreate the bid form
@@ -110,6 +125,9 @@ def get_app(myfunc, new_update, config_filename):
 
                         try:
                             float(my_bid)
+
+                            old_bid = old_redis[new_update.choice][new_update.campaign_id]
+                            new_update.get_oldvalue(old_bid)
 
                             if new_update.choice == 'lowerbid':
                                 new_update.get_number(my_bid)
@@ -129,12 +147,19 @@ def get_app(myfunc, new_update, config_filename):
                             flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                             return render_template("base_home.html", choice=choice, step=1)
 
+                    reply_value = old_redis[new_update.choice][new_update.campaign_id]
+                    if new_update.choice == 'status':
+                        if new_update.bid == 0.0:
+                            reply_value = 'Paused'
+                        else:
+                            reply_value = 'Activated'
+
+
                     try:
                         myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
-                        return render_template("algo_response.html", term="successful", dog="/static/images/happy-dog2.jpg",
-                                               choice=new_update.choicename, id=new_update.campaign_id,
-                                               bid=old_redis[new_update.choice][new_update.campaign_id],
-                                               redis=old_redis[new_update.choice])
+                        return render_template("algo_response.html", term="successful", choice=new_update.choicename,
+                                               id=new_update.campaign_id, oldbid=new_update.oldvalue, bid=reply_value,
+                                               redis=old_redis[new_update.choice], DSP=new_update.DSP)
                     except:
                         SystemExit
                         return render_template("algo_response.html", term="unsuccessful. The value remains the same",
