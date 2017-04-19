@@ -40,7 +40,6 @@ def get_app(myfunc, new_update, config_filename):
             return render_template('base_home.html', form=form, step=0)
 
         else:  # if method == POST
-
             if len(request.form) == 3:  # if this is the first round
 
                 if form.validate():
@@ -51,7 +50,7 @@ def get_app(myfunc, new_update, config_filename):
                     myfunc.printargs(new_update.choice)
                     myfunc.printargs(new_update.DSP)
 
-                    message = Markup('Your campaign ID is valid.You are updating the %s for %s Campaign: <b>%s</b>') % \
+                    message = Markup('You entered a valid campaign ID. Updating the %s for %s Campaign: <b>%s</b>') % \
                               (choice_name, new_update.DSP, new_update.campaign_id)
                     flash(message)
 
@@ -102,19 +101,24 @@ def get_app(myfunc, new_update, config_filename):
 
                     elif new_update.choice == 'frequency_cap':
                         my_cap = data['frequency_cap']
-                        try:
-                            float(my_cap)
-                            new_update.get_number(my_cap)
-                            #store the old value
-                            old_cap = old_redis['frequency_cap'][new_update.campaign_id]
-                            new_update.get_oldvalue(old_cap)
+                        if my_cap:              #checking for blank
+                            try:                    #checking for invalid input
+                                float(my_cap)
+                                new_update.get_number(my_cap)
+                                #store the old value
+                                old_cap = old_redis['frequency_cap'][new_update.campaign_id]
+                                new_update.get_oldvalue(old_cap)
 
-                            #update the new value
-                            old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+                                #update the new value
+                                old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
 
-                        #recreate the bid form
-                        except:
-                            ValueError
+                            #recreate the bid form
+                            except ValueError:
+                                form2 = CapForm(request.form)
+                                choice = form2.frequency_cap
+                                flash("Sorry, the cap you enter must be in integer form, e,g, 3")
+                                return render_template("base_home.html", choice=choice, step=1)
+                        else:
                             form2 = CapForm(request.form)
                             choice = form2.frequency_cap
                             flash("Sorry, the cap you enter must be in integer form, e,g, 3")
@@ -122,32 +126,41 @@ def get_app(myfunc, new_update, config_filename):
 
                     else:
                         my_bid = data['bid']
+                        if my_bid:     #if bid field is not left blank
 
-                        try:
-                            float(my_bid)
+                            try:
+                                float(my_bid)
 
-                            old_bid = old_redis[new_update.choice][new_update.campaign_id]
-                            new_update.get_oldvalue(old_bid)
+                                old_bid = old_redis[new_update.choice][new_update.campaign_id]
+                                new_update.get_oldvalue(old_bid)
 
-                            if new_update.choice == 'lowerbid':
-                                new_update.get_number(my_bid)
-                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+                                if new_update.choice == 'lowerbid':
+                                    new_update.get_number(my_bid)
+                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                            elif new_update.choice == 'maxbid':
-                                new_update.get_number(my_bid)
-                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+                                elif new_update.choice == 'maxbid':
+                                    new_update.get_number(my_bid)
+                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                            elif new_update.choice == 'bid':
-                                new_update.get_number(my_bid)
-                                old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
+                                elif new_update.choice == 'bid':
+                                    new_update.get_number(my_bid)
+                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                        except ValueError:
+                            except ValueError:
+                                form2 = BidForm(request.form)
+                                choice=form2.bid
+                                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                                return render_template("base_home.html", choice=choice, step=1)
+
+                        else:
                             form2 = BidForm(request.form)
-                            choice=form2.bid
+                            choice = form2.bid
                             flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                             return render_template("base_home.html", choice=choice, step=1)
 
+                    #update the redis
                     reply_value = old_redis[new_update.choice][new_update.campaign_id]
+
                     if new_update.choice == 'status':
                         if new_update.bid == 0.0:
                             reply_value = 'Paused'
@@ -166,7 +179,7 @@ def get_app(myfunc, new_update, config_filename):
                                                dog="/static/images/sad-dog.jpg")
 
 
-    app.debug = True
+    app.debug = False
     return app
 
 
