@@ -7,6 +7,7 @@ import argparse
 from flask import *
 from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
 from tools.functionality import Functionality, userInfo
+import datetime
 
 
 # parsing the init arguments for access to the redisDB
@@ -50,8 +51,8 @@ def get_app(myfunc, new_update, config_filename):
                     myfunc.printargs(new_update.choice)
                     myfunc.printargs(new_update.DSP)
 
-                    message = Markup('You entered a valid campaign ID. Updating the %s for %s Campaign: <b>%s</b>') % \
-                              (choice_name, new_update.DSP, new_update.campaign_id)
+                    message = Markup('Attempting to update the %s for %s Campaign: <b>%s</b>') % \
+                              (choice_name, new_update.DSP.title(), new_update.campaign_id)
                     flash(message)
 
                     if new_update.choice == "status":
@@ -80,7 +81,7 @@ def get_app(myfunc, new_update, config_filename):
                     return render_template("base_home.html", form=form, step=0)
 
                 else:
-                # validate forms!
+                    new_time = datetime.datetime.now().isoformat()
                     if new_update.choice == 'status':
 
                         #store the old value
@@ -99,9 +100,12 @@ def get_app(myfunc, new_update, config_filename):
                             new_update.get_number(0.0)
                             old_redis['status'][new_update.campaign_id] = 0.0
 
+                        #update time
+                        old_redis['lastupdatetime'][new_update.campaign_id] = new_time
+
                     elif new_update.choice == 'frequency_cap':
                         my_cap = data['frequency_cap']
-                        if my_cap:              #checking for blank
+                        if my_cap and int(my_cap) > 0 and int(my_cap) < 300:              #checking for blank, setting max/min
                             try:                    #checking for invalid input
                                 float(my_cap)
                                 new_update.get_number(my_cap)
@@ -111,6 +115,7 @@ def get_app(myfunc, new_update, config_filename):
 
                                 #update the new value
                                 old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
+                                old_redis['lastupdatetime'][new_update.campaign_id] = new_time
 
                             #recreate the bid form
                             except ValueError:
@@ -121,12 +126,12 @@ def get_app(myfunc, new_update, config_filename):
                         else:
                             form2 = CapForm(request.form)
                             choice = form2.frequency_cap
-                            flash("Sorry, the cap you enter must be in integer form, e,g, 3")
+                            flash("Sorry, the cap you enter must be a number between 0 and 300")
                             return render_template("base_home.html", choice=choice, step=1)
 
                     else:
                         my_bid = data['bid']
-                        if my_bid:     #if bid field is not left blank
+                        if my_bid and my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
 
                             try:
                                 float(my_bid)
@@ -146,6 +151,8 @@ def get_app(myfunc, new_update, config_filename):
                                     new_update.get_number(my_bid)
                                     old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
+                                old_redis['lastupdatetime'][new_update.campaign_id] = new_time
+
                             except ValueError:
                                 form2 = BidForm(request.form)
                                 choice=form2.bid
@@ -155,7 +162,7 @@ def get_app(myfunc, new_update, config_filename):
                         else:
                             form2 = BidForm(request.form)
                             choice = form2.bid
-                            flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                            flash("Sorry, are you sure you entered a bid? It may be too high or too low")
                             return render_template("base_home.html", choice=choice, step=1)
 
                     #update the redis
@@ -172,7 +179,7 @@ def get_app(myfunc, new_update, config_filename):
                         myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
                         return render_template("algo_response.html", term="successful", choice=new_update.choicename,
                                                id=new_update.campaign_id, oldbid=new_update.oldvalue, bid=reply_value,
-                                               redis=old_redis[new_update.choice], DSP=new_update.DSP)
+                                               redis=old_redis[new_update.choice], DSP=new_update.DSP.title())
                     except:
                         SystemExit
                         return render_template("algo_response.html", term="unsuccessful. The value remains the same",

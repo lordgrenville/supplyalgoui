@@ -15,7 +15,7 @@ class Functionality:
         pass
 
     def printargs(self, x):
-        # print (self.crdb)
+        print (self.drdb)
         print(x)
 
     def getdoc(self,dspname):
