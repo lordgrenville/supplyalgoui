@@ -1,4 +1,10 @@
 from .Redis.myredis import myredis
+import datetime
+import time
+
+def yotamTime():
+    # time in format YYYY-MM-DD HH:MM:SS.FFF
+    return str(datetime.datetime.fromtimestamp(int(round(time.time() * 1000)) / 1e3))
 
 class Functionality:
     def __init__(self,crdb,drdb,redisindex,redismastername,redisipvec,esippush,esindnpush,timezone,log_level):

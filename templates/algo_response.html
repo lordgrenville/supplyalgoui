@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<H3><a href="/">HOME</a></H3>
+
 
 <p name="loading"></p>
 <p id="demo">
@@ -17,7 +17,36 @@
         <br>
         All other information in the algorithm remains the same.
         <br>
-        <br>
+
+    <html>
+    <body>
+    <!--<p> The download will begin in <span id="countdowntimer">10 </span> Seconds</p>-->
+    <!--<script>-->
+        <!--var timer = setTimeout(function() {-->
+            <!--window.location='/'-->
+        <!--}, 15000);-->
+    <!--</script>-->
+
+
+<div id="timer"> <b>Redirecting you to the home page in <span id="countdowntimer">10</span> seconds.</b> </div>
+<br>
+<button type="button" onclick="clearInterval(downloadTimer); document.getElementById('timer').style.display = 'none'">Cancel</button>
+<H3><a href="/">Go home now</a></H3>
+<br>
+<script>
+    var timeleft = 10;
+    var downloadTimer = setInterval(function(){
+    timeleft--;
+    document.getElementById("countdowntimer").textContent = timeleft;
+    if(timeleft <= 0)
+         window.location='/'
+    },1000);
+</script>
+
+</body>
+</html>
+
+    <br>
         Full list of {{choice}} for {{DSP}}:
         <br>
         <br>

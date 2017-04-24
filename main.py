@@ -6,8 +6,7 @@ import re
 import argparse
 from flask import *
 from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
-from tools.functionality import Functionality, userInfo
-import datetime
+from tools.functionality import Functionality, userInfo, yotamTime
 
 
 # parsing the init arguments for access to the redisDB
@@ -30,7 +29,7 @@ def parsing():
 def get_app(myfunc, new_update, config_filename):
     app = Flask(__name__)
     # app.config.from_object(config_filename)
-    app.config['SECRET_KEY'] = 'bx85EMx91xbf~8x8bxb3xfc!xe1xedxb6*xdeMxd7xeax06x9exda_'
+    app.config['SECRET_KEY'] = 'os.urandom(10)'
 
     # home view
     @app.route('/', methods=['GET', 'POST'])
@@ -81,7 +80,8 @@ def get_app(myfunc, new_update, config_filename):
                     return render_template("base_home.html", form=form, step=0)
 
                 else:
-                    new_time = datetime.datetime.now().isoformat()
+                    new_time = yotamTime()
+
                     if new_update.choice == 'status':
 
                         #store the old value
@@ -101,13 +101,14 @@ def get_app(myfunc, new_update, config_filename):
                             old_redis['status'][new_update.campaign_id] = 0.0
 
                         #update time
-                        old_redis['lastupdatetime'][new_update.campaign_id] = new_time
+                        old_redis['useruts'][new_update.campaign_id] = new_time
 
                     elif new_update.choice == 'frequency_cap':
-                        my_cap = data['frequency_cap']
-                        if my_cap and int(my_cap) > 0 and int(my_cap) < 300:              #checking for blank, setting max/min
-                            try:                    #checking for invalid input
-                                float(my_cap)
+                        try:
+                            my_cap = float(data['frequency_cap'])
+
+                            #validate not blank, whole number, set max and min
+                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap < 300:
                                 new_update.get_number(my_cap)
                                 #store the old value
                                 old_cap = old_redis['frequency_cap'][new_update.campaign_id]
@@ -115,27 +116,25 @@ def get_app(myfunc, new_update, config_filename):
 
                                 #update the new value
                                 old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
-                                old_redis['lastupdatetime'][new_update.campaign_id] = new_time
+                                old_redis['useruts'][new_update.campaign_id] = new_time
+
+                            else:
+                                form2 = CapForm(request.form)
+                                choice = form2.frequency_cap
+                                flash("Sorry, the cap you enter must be a whole number between 0 and 300")
+                                return render_template("base_home.html", choice=choice, step=1)
 
                             #recreate the bid form
-                            except ValueError:
+                        except ValueError:
                                 form2 = CapForm(request.form)
                                 choice = form2.frequency_cap
                                 flash("Sorry, the cap you enter must be in integer form, e,g, 3")
                                 return render_template("base_home.html", choice=choice, step=1)
-                        else:
-                            form2 = CapForm(request.form)
-                            choice = form2.frequency_cap
-                            flash("Sorry, the cap you enter must be a number between 0 and 300")
-                            return render_template("base_home.html", choice=choice, step=1)
 
                     else:
-                        my_bid = data['bid']
-                        if my_bid and my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
-
-                            try:
-                                float(my_bid)
-
+                        try:
+                            my_bid = float(data['bid'])
+                            if data['bid'] and my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
                                 old_bid = old_redis[new_update.choice][new_update.campaign_id]
                                 new_update.get_oldvalue(old_bid)
 
@@ -151,19 +150,19 @@ def get_app(myfunc, new_update, config_filename):
                                     new_update.get_number(my_bid)
                                     old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
 
-                                old_redis['lastupdatetime'][new_update.campaign_id] = new_time
+                                old_redis['useruts'][new_update.campaign_id] = new_time
 
-                            except ValueError:
+                            else:
+                                form2 = BidForm(request.form)
+                                choice = form2.bid
+                                flash("Sorry, are you sure you entered a bid? It may be too high or too low")
+                                return render_template("base_home.html", choice=choice, step=1)
+
+                        except ValueError:
                                 form2 = BidForm(request.form)
                                 choice=form2.bid
                                 flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                                 return render_template("base_home.html", choice=choice, step=1)
-
-                        else:
-                            form2 = BidForm(request.form)
-                            choice = form2.bid
-                            flash("Sorry, are you sure you entered a bid? It may be too high or too low")
-                            return render_template("base_home.html", choice=choice, step=1)
 
                     #update the redis
                     reply_value = old_redis[new_update.choice][new_update.campaign_id]
