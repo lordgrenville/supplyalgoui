@@ -4,7 +4,11 @@ import time
 
 def yotamTime():
     # time in format YYYY-MM-DD HH:MM:SS.FFF
-    return str(datetime.datetime.fromtimestamp(int(round(time.time() * 1000)) / 1e3))
+    t = str(datetime.datetime.fromtimestamp(time.time()))
+    tail = t[-7:]
+    f = round(float(tail),3)
+    temp = "%.3f" % f
+    return "%s%s" % (t[:-7], temp[1:])
 
 class Functionality:
     def __init__(self,crdb,drdb,redisindex,redismastername,redisipvec,esippush,esindnpush,timezone,log_level):

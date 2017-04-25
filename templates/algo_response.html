@@ -1,70 +1,14 @@
 {% extends "home.html" %}
 
 {% block content %}
-
-
-
-<p name="loading"></p>
-<p id="demo">
-  The upload was
-  {{term}}.
-  <br>
-      {% if term == "successful" %}
-
-        <br>
-        The <b>{{choice}}</b> for campaign <b>{{id}}</b> has been changed to <b>{{bid}}</b> (from <b>{{oldbid}}</b>).
-        <br>
-        <br>
-        All other information in the algorithm remains the same.
-        <br>
-
     <html>
     <body>
-    <!--<p> The download will begin in <span id="countdowntimer">10 </span> Seconds</p>-->
-    <!--<script>-->
-        <!--var timer = setTimeout(function() {-->
-            <!--window.location='/'-->
-        <!--}, 15000);-->
-    <!--</script>-->
-
-
-<!--<div id="timer"> <b>Redirecting you to the home page in <span id="countdowntimer">10</span> seconds.</b> </div>-->
-<br>
-<!--<button type="button" onclick="clearInterval(downloadTimer); document.getElementById('timer').style.display = 'none'">Cancel</button>-->
-<H3><a href="/">Go home now</a></H3>
-<br>
-<!--<script>-->
-    <!--var timeleft = 10;-->
-    <!--var downloadTimer = setInterval(function(){-->
-    <!--timeleft&#45;&#45;;-->
-    <!--document.getElementById("countdowntimer").textContent = timeleft;-->
-    <!--if(timeleft <= 0)-->
-         <!--window.location='/'-->
-    <!--},1000);-->
-<!--</script>-->
-
+  The upload was unsuccessful due to an evil {{term}}! All data remains unchanged.
+  <br><br><br>
+<H3><a href="/">Try again</a></H3>
+  <br><br><br>
+    <IMG SRC={{dog}} ALIGN="BOTTOM">
 </body>
 </html>
-
-    <br>
-        Full list of {{choice}} for {{DSP}}:
-        <br>
-        <br>
-        <table>
-            {% for key,value in redis.items() %}
-                <tr>
-                    <th>{{key}}</th>
-                    <td>{{value}}</td>
-                </tr>
-            {% endfor %}
-        </table>
-
-    {%else %}
-
-        All information in the algorithm remains the same.
-        <IMG SRC={{dog}} ALIGN="BOTTOM">
-    {% endif %}
-
-<p>
 
 {% endblock %}

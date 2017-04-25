@@ -7,6 +7,7 @@ import argparse
 from flask import *
 from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
 from tools.functionality import Functionality, userInfo, yotamTime
+from redis.exceptions import *
 
 
 # parsing the init arguments for access to the redisDB
@@ -86,7 +87,7 @@ def get_app(myfunc, new_update, config_filename):
 
                         #store the old value
                         my_status = data['status']
-                        if old_redis['status'][new_update.campaign_id] == 1.0:
+                        if old_redis['status'][new_update.campaign_id] == True:
                             old_status = "Activated"
                         else:
                             old_status = "Paused"
@@ -94,11 +95,11 @@ def get_app(myfunc, new_update, config_filename):
 
                         #update the redis over here
                         if my_status == 'Activated':
-                            new_update.get_number(1.0)
-                            old_redis['status'][new_update.campaign_id] = 1.0
+                            new_update.get_number(True)
+                            old_redis['status'][new_update.campaign_id] = True
                         else:
-                            new_update.get_number(0.0)
-                            old_redis['status'][new_update.campaign_id] = 0.0
+                            new_update.get_number(False)
+                            old_redis['status'][new_update.campaign_id] = False
 
                         #update time
                         old_redis['useruts'][new_update.campaign_id] = new_time
@@ -155,7 +156,7 @@ def get_app(myfunc, new_update, config_filename):
                             else:
                                 form2 = BidForm(request.form)
                                 choice = form2.bid
-                                flash("Sorry, are you sure you entered a bid? It may be too high or too low")
+                                flash("Sorry, are you sure you entered a bid? It must be between 0 and 20.")
                                 return render_template("base_home.html", choice=choice, step=1)
 
                         except ValueError:
@@ -168,21 +169,19 @@ def get_app(myfunc, new_update, config_filename):
                     reply_value = old_redis[new_update.choice][new_update.campaign_id]
 
                     if new_update.choice == 'status':
-                        if new_update.bid == 0.0:
+                        if new_update.bid == False:
                             reply_value = 'Paused'
                         else:
                             reply_value = 'Activated'
 
-
                     try:
                         myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
-                        return render_template("algo_response.html", term="successful", choice=new_update.choicename,
+                        form = PrimaryForm(request.form)
+                        return render_template("base_home.html", term="successful", choice=new_update.choicename,
                                                id=new_update.campaign_id, oldbid=new_update.oldvalue, bid=reply_value,
-                                               redis=old_redis[new_update.choice], DSP=new_update.DSP.title())
-                    except:
-                        SystemExit
-                        return render_template("algo_response.html", term="unsuccessful. The value remains the same",
-                                               dog="/static/images/sad-dog.jpg")
+                                               step=2, form=form)
+                    except (ConnectionError,ResponseError,TimeoutError,WatchError,InvalidResponse) as m:
+                        return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
 
 
     app.debug = False

@@ -3,6 +3,13 @@
 {% block header %}<H1>Update algo</H1>{% endblock %}
 {% block content %}
 
+    {% if step == 2 %}
+      The upload was {{term}}.<br>
+        The <b>{{choice}}</b> for campaign <b>{{id}}</b> has been changed to <b>{{bid}}</b> (from <b>{{oldbid}}</b>).
+        <br><br>
+        All other information in the algorithm remains the same. <br>
+    {% endif %}
+
 <form action="/" method="post">
   <dl>
 
