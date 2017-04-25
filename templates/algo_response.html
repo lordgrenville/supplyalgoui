@@ -1,14 +1,14 @@
 {% extends "home.html" %}
 
 {% block content %}
-<p name="loading"></p>
-<p id="demo">
-  The upload was
-  {{term}}.
-  <br>
-  <br>
-  Here is the redis info {{doc}}
-</p>
-<IMG SRC={{dog}} ALIGN="BOTTOM">
+    <html>
+    <body>
+  The upload was unsuccessful due to an evil {{term}}! All data remains unchanged.
+  <br><br><br>
+<H3><a href="/">Try again</a></H3>
+  <br><br><br>
+    <IMG SRC={{dog}} ALIGN="BOTTOM">
+</body>
+</html>
 
 {% endblock %}

@@ -1,15 +1,14 @@
 from wtforms import Form, SelectField, StringField, IntegerField, DecimalField, validators
-
-class RegistrationForm(Form):
+class PrimaryForm(Form):
     campaignID = StringField('Campaign ID',[validators.Length(min=1, max=99, message="Please enter a campaign ID")])
-    choice = SelectField('Choice', choices=[('min_bid', 'Minimum Bid'), ('max_bid', 'Maximum Bid'), ('cur_bid', 'Current Bid'),('cap', 'Cap'), ('status', 'Status')])
-    DSP = SelectField('DSP',choices=[('Nuviad', 'Nuviad'),('Pocket', 'Pocket')])
+    choice = SelectField('Choice', choices=[('lowerbid', 'Minimum Bid'), ('maxbid', 'Maximum Bid'), ('bid', 'Current Bid'),('frequency_cap', 'Cap'), ('status', 'Status')])
+    dsp = SelectField('DSP',choices=[('nuviad', 'Nuviad'),('pocket', 'Pocket')])  #upper case for display, but must be lower case for redisDB!
 
 class BidForm(Form):
-    bid = DecimalField('Bid', places=2)
+    bid = StringField('Bid', [validators.Length(min=1,message="Please enter a bid")])
 
 class CapForm(Form):
-    cap = IntegerField('Cap',[validators.input_required('Please please please me'), validators.number_range(0,999,'Your bid must be between 0 and 999')])
+    frequency_cap = IntegerField('Cap', [validators.Length(min=1, message="Please enter a cap")])
 
 class StatusForm(Form):
     status = SelectField('Status', choices=[('Activated', 'Activated'),('Paused', 'Paused')])
