@@ -109,7 +109,7 @@ def get_app(myfunc, new_update, config_filename):
                             my_cap = float(data['frequency_cap'])
 
                             #validate not blank, whole number, set max and min
-                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap < 300:
+                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap < 500:
                                 new_update.get_number(my_cap)
                                 #store the old value
                                 old_cap = old_redis['frequency_cap'][new_update.campaign_id]
@@ -122,7 +122,7 @@ def get_app(myfunc, new_update, config_filename):
                             else:
                                 form2 = CapForm(request.form)
                                 choice = form2.frequency_cap
-                                flash("Sorry, the cap you enter must be a whole number between 0 and 300")
+                                flash("Sorry, the frequency cap must be a whole number between 0 and 300")
                                 return render_template("base_home.html", choice=choice, step=1)
 
                             #recreate the bid form
@@ -168,6 +168,8 @@ def get_app(myfunc, new_update, config_filename):
                     #update the redis
                     reply_value = old_redis[new_update.choice][new_update.campaign_id]
 
+                    #update some terms for user message
+                    new_update.get_name(old_redis['name'][new_update.campaign_id])
                     if new_update.choice == 'status':
                         if new_update.bid == False:
                             reply_value = 'Paused'
@@ -178,8 +180,8 @@ def get_app(myfunc, new_update, config_filename):
                         myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
                         form = PrimaryForm(request.form)
                         return render_template("base_home.html", term="successful", choice=new_update.choicename,
-                                               id=new_update.campaign_id, oldbid=new_update.oldvalue, bid=reply_value,
-                                               step=2, form=form)
+                                               id=new_update.name, oldbid=new_update.oldvalue, bid=reply_value,
+                                               DSP=new_update.DSP, step=2, form=form)
                     except (ConnectionError,ResponseError,TimeoutError,WatchError,InvalidResponse) as m:
                         return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
 
