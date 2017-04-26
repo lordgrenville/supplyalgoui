@@ -49,3 +49,5 @@ class userInfo:
         self.bid = float(bid)
     def get_oldvalue(self, value):
         self.oldvalue = value
+    def get_name(self, name):
+        self.name = name
