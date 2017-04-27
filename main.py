@@ -109,7 +109,7 @@ def get_app(myfunc, new_update, config_filename):
                             my_cap = float(data['frequency_cap'])
 
                             #validate not blank, whole number, set max and min
-                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap < 500:
+                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap <= 300:
                                 new_update.get_number(my_cap)
                                 #store the old value
                                 old_cap = old_redis['frequency_cap'][new_update.campaign_id]
