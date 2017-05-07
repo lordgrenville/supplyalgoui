@@ -5,9 +5,8 @@
 import re
 import argparse
 from flask import *
-from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
+from tools.forms import PrimaryForm
 from tools.functionality import Functionality, userInfo, yotamTime
-from redis.exceptions import *
 
 
 # parsing the init arguments for access to the redisDB
@@ -37,158 +36,151 @@ def get_app(myfunc, new_update, config_filename):
     def home():
         form = PrimaryForm(request.form)
 
-        if not request.method == 'POST':
+        if request.method == 'GET':
             return render_template('base_home.html', form=form, step=0)
 
-        else:  # if method == POST
-            if len(request.form) == 3:  # if this is the first round
+        if form.campaignID.data == '':
+            flash('You didn\'t enter a campaign ID!')
+            return render_template("base_home.html", form=form, step=0)
 
-                if form.validate():
-                    choice_name = dict(form.choice.choices).get(form.choice.data)
-                    new_update.get_info(form.campaignID.data.strip(), form.dsp.data, form.choice.data, choice_name)
-                    # the .strip() removes trailing spaces
-                    myfunc.printargs(new_update.campaign_id)
-                    myfunc.printargs(new_update.choice)
-                    myfunc.printargs(new_update.DSP)
+        options = {'bid':form.curbid.data, 'maxbid':form.maxbid.data, 'lowerbid':form.minbid.data,
+                   'frequency_cap':form.frequency_cap.data, 'status':form.status.data}
 
-                    message = Markup('Attempting to update the %s for %s Campaign: <b>%s</b>') % \
-                              (choice_name, new_update.DSP.title(), new_update.campaign_id)
-                    flash(message)
+        new_update.get_info(form.campaignID.data.strip(), form.dsp.data)
+        # adds CID and DSP to new_updates. the .strip() removes trailing spaces
 
-                    if new_update.choice == "status":
-                        form2 = StatusForm(request.form)
-                        choice = form2.status
-                    elif new_update.choice == "frequency_cap":
-                        form2 = CapForm(request.form)
-                        choice = form2.frequency_cap
-                    else:
-                        form2 = BidForm(request.form)
-                        choice = form2.bid
-                    return render_template('base_home.html', choice=choice, step=1)
+        # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
 
-                else:
-                    flash('There was an issue with your input. Please try again.')
-                    return render_template("base_home.html", form=form, step=0)
+        #Es.log try - except
+        old_redis = myfunc.getdoc(new_update.DSP)
 
+        # Es.log try - except
+        new_update.get_name(old_redis['name'][new_update.campaign_id])
+
+        if new_update.campaign_id not in old_redis['status']:
+            flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
+                  " of your parameters and try again.")
+            return render_template("base_home.html", form=form, step=0)
+
+        if all(v == '' for v in options.values()):
+            info = {'Name': old_redis['name'][new_update.campaign_id],
+                    'Status':old_redis['status'][new_update.campaign_id],
+                    'Bid':old_redis['bid'][new_update.campaign_id],
+                    'Maximum Bid':old_redis['maxbid'][new_update.campaign_id],
+                    'Minimum Bid':old_redis['lowerbid'][new_update.campaign_id],
+                    'Cap':old_redis['frequency_cap'][new_update.campaign_id]}
+            return render_template("base_home.html", info=info, DSP=new_update.DSP, id=new_update.name, form=form,
+                                   step=1, rows=0)
+
+        for x in options.keys():
+            if options[x] != '':
+                new_update.updates[x] = options[x]
+
+        new_time = yotamTime()
+
+        if 'status' in new_update.updates:
+            #store the old value
+            if old_redis['status'][new_update.campaign_id] == True:
+                new_update.oldvalues['status'] = "Activated"
             else:
-                # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
-                old_redis = myfunc.getdoc(new_update.DSP)
-                data = request.form.to_dict()
+                new_update.oldvalues['status'] = "Paused"
 
-                if new_update.campaign_id not in old_redis[new_update.choice]:
-                    flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
-                          " of your parameters and try again.")
-                    return render_template("base_home.html", form=form, step=0)
+            #update the redis over here
+            if new_update.updates['status'] == 'Activated':
+                old_redis['status'][new_update.campaign_id] = True
+            else:
+                old_redis['status'][new_update.campaign_id] = False
+
+        if 'frequency_cap' in new_update.updates:
+            try:
+                my_cap = float(new_update.updates['frequency_cap'])
+                #validate whole number, set max and min
+                if my_cap.is_integer() and my_cap > 0 and my_cap <= 500:
+                    #store the old value
+                    new_update.oldvalues['frequency_cap'] = old_redis['frequency_cap'][new_update.campaign_id]
+                    #update the new value
+                    old_redis['frequency_cap'][new_update.campaign_id] = my_cap
 
                 else:
-                    new_time = yotamTime()
+                    flash("Sorry, the frequency cap must be a whole number between 0 and 300")
+                    return render_template("base_home.html", form=form, step=0)
 
-                    if new_update.choice == 'status':
+            except ValueError:
+                    flash("Sorry, the cap you enter must be in integer form, e,g, 3")
+                    return render_template("base_home.html", form=form, step=0)
 
-                        #store the old value
-                        my_status = data['status']
-                        if old_redis['status'][new_update.campaign_id] == True:
-                            old_status = "Activated"
-                        else:
-                            old_status = "Paused"
-                        new_update.get_oldvalue(old_status)
+        if 'bid' in new_update.updates:
+            try:
+                my_bid = float(new_update.updates['bid'])
+                if my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
+                    old_bid = old_redis['bid'][new_update.campaign_id]
+                    new_update.oldvalues['bid'] = old_bid
+                    old_redis['bid'][new_update.campaign_id] = my_bid
+                else:
+                    flash("Sorry, your bid must be between 0 and 20.")
+                    return render_template("base_home.html", form=form, step=0)
 
-                        #update the redis over here
-                        if my_status == 'Activated':
-                            new_update.get_number(True)
-                            old_redis['status'][new_update.campaign_id] = True
-                        else:
-                            new_update.get_number(False)
-                            old_redis['status'][new_update.campaign_id] = False
+            except ValueError:
+                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                return render_template("base_home.html", form=form, step=0)
 
-                        #update time
-                        old_redis['useruts'][new_update.campaign_id] = new_time
+        if 'lowerbid' in new_update.updates:
+            try:
+                my_lowerbid = float(new_update.updates['lowerbid'])
+                if my_lowerbid > 0 and my_lowerbid < 20:  # validating not blank, setting min/max
+                    old_bid = old_redis['lowerbid'][new_update.campaign_id]
+                    new_update.oldvalues['lowerbid'] = old_bid
+                    old_redis['lowerbid'][new_update.campaign_id] = my_lowerbid
+                else:
+                    flash("Sorry, your bid must be between 0 and 20.")
+                    return render_template("base_home.html", form=form, step=0)
 
-                    elif new_update.choice == 'frequency_cap':
-                        try:
-                            my_cap = float(data['frequency_cap'])
+            except ValueError:
+                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                return render_template("base_home.html", form=form, step=0)
 
-                            #validate not blank, whole number, set max and min
-                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap <= 300:
-                                new_update.get_number(my_cap)
-                                #store the old value
-                                old_cap = old_redis['frequency_cap'][new_update.campaign_id]
-                                new_update.get_oldvalue(old_cap)
+        if 'maxbid' in new_update.updates:
+            try:
+                my_maxbid = float(new_update.updates['maxbid'])
+                if my_maxbid > 0 and my_maxbid <= 20:  # validating not blank, setting min/max
+                    old_bid = old_redis['maxbid'][new_update.campaign_id]
+                    new_update.oldvalues['maxbid'] = old_bid
+                    old_redis['maxbid'][new_update.campaign_id] = my_maxbid
+                else:
+                    flash("Sorry, your bid must be between 0 and 20.")
+                    return render_template("base_home.html", form=form, step=0)
 
-                                #update the new value
-                                old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
-                                old_redis['useruts'][new_update.campaign_id] = new_time
+            except ValueError:
+                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
+                return render_template("base_home.html", form=form, step=0)
+        # update time
+        old_redis['useruts'][new_update.campaign_id] = new_time
 
-                            else:
-                                form2 = CapForm(request.form)
-                                choice = form2.frequency_cap
-                                flash("Sorry, the frequency cap must be a whole number between 0 and 300")
-                                return render_template("base_home.html", choice=choice, step=1)
+        changes = []
+        olds = []
+        news = []
+        for k, v in new_update.updates.items():
+            if v != '':
+                changes.append(k.title())
+                olds.append(new_update.oldvalues[k])
+                news.append(new_update.updates[k])
+        rows = len(changes)
 
-                            #recreate the bid form
-                        except ValueError:
-                                form2 = CapForm(request.form)
-                                choice = form2.frequency_cap
-                                flash("Sorry, the cap you enter must be in integer form, e,g, 3")
-                                return render_template("base_home.html", choice=choice, step=1)
+        #return landing page to user with success/failure message
+        try:
+            myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
+            return render_template("base_home.html", term="successful", id=new_update.name, DSP=new_update.DSP.title(),
+                                   changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
+        except SystemExit as m:
+            #ES as log
+            return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
 
-                    else:
-                        try:
-                            my_bid = float(data['bid'])
-                            if data['bid'] and my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
-                                old_bid = old_redis[new_update.choice][new_update.campaign_id]
-                                new_update.get_oldvalue(old_bid)
-
-                                if new_update.choice == 'lowerbid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                elif new_update.choice == 'maxbid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                elif new_update.choice == 'bid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                old_redis['useruts'][new_update.campaign_id] = new_time
-
-                            else:
-                                form2 = BidForm(request.form)
-                                choice = form2.bid
-                                flash("Sorry, are you sure you entered a bid? It must be between 0 and 20.")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                        except ValueError:
-                                form2 = BidForm(request.form)
-                                choice=form2.bid
-                                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                    #update the redis
-                    reply_value = old_redis[new_update.choice][new_update.campaign_id]
-
-                    #update some terms for user message
-                    new_update.get_name(old_redis['name'][new_update.campaign_id])
-                    if new_update.choice == 'status':
-                        if new_update.bid == False:
-                            reply_value = 'Paused'
-                        else:
-                            reply_value = 'Activated'
-
-                    try:
-                        myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
-                        form = PrimaryForm(request.form)
-                        return render_template("base_home.html", term="successful", choice=new_update.choicename,
-                                               id=new_update.name, oldbid=new_update.oldvalue, bid=reply_value,
-                                               DSP=new_update.DSP, step=2, form=form)
-                    except (ConnectionError,ResponseError,TimeoutError,WatchError,InvalidResponse) as m:
-                        return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
-
+    @app.errorhandler(500)
+    def pageNotFound(error):
+        return render_template("algo_response.html", term=error)
 
     app.debug = False
     return app
-
 
 if __name__ == '__main__':
 

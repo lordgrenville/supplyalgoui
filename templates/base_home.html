@@ -5,25 +5,62 @@
 
     {% if step == 2 %}
       The upload was {{term}}.<br>
-        The <b>{{choice}}</b> for {{DSP}} campaign <b>{{id}}</b> has been changed to <b>{{bid}}</b> (from <b>{{oldbid}}</b>).
-        <br><br>
-        All other information in the algorithm remains the same. <br>
+The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
+    <br><br>
+
+
+
+    <table>
+        <tr>
+            <td><b>Field</b></td>
+            <td><b>Old Value</b></td>
+            <td><b>New Value</b></td>
+        </tr>
+        {% for x in range(0,rows) %}
+        <tr>
+            <td>{{changes[x]}}</td>
+            <td>{{olds[x]}}</td>
+            <td>{{news[x]}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    All other information in the algorithm remains the same. <br>
+    {% endif %}
+
+    {% if step == 1 %}
+      Information for <b>{{DSP}}</b> campaign <b>{{id}}</b>:.<br>
+    <br><br>
+
+    <table>
+        <tr>
+            <td>Field</td>
+            <td>Value</td>
+        </tr>
+        {% for key, value in info.items() %}
+        <tr>
+            <td>{{key}}</td>
+            <td>{{value}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    To make changes, simply add them below and click <b>Update</b>.<br>
     {% endif %}
 
 <form action="/" method="post">
   <dl>
 
-    {% if step == 1 %}
-
-        {{render_field(choice)}}
-
-    {%else %}
-
-        {{ render_field(form.campaignID) }}
-        {{ render_field(form.choice) }}
         {{ render_field(form.dsp) }}
+        {{ render_field(form.campaignID) }}
 
-    {% endif %}
+      <form action="/" method="post"><p><input type=submit value="Get Information">
+
+        {{ render_field(form.status) }}
+        {{ render_field(form.curbid) }}
+        {{ render_field(form.maxbid) }}
+        {{ render_field(form.minbid) }}
+        {{ render_field(form.frequency_cap) }}
 
   </dl>
   <p><input type=submit value=Update>

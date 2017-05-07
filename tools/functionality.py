@@ -37,17 +37,10 @@ class Functionality:
 
 class userInfo:
     def __init__(self):
-        self.campaign_id = None
-        self.DSP = None
-        self.choice = None
-    def get_info(self, campaign_id,  DSP, choice, choicename):
+        self.updates = {}
+        self.oldvalues = {}
+    def get_info(self, campaign_id,  DSP):
         self.campaign_id = str(campaign_id)
         self.DSP = str(DSP)
-        self.choice = str(choice)
-        self.choicename = choicename
-    def get_number(self, bid):
-        self.bid = float(bid)
-    def get_oldvalue(self, value):
-        self.oldvalue = value
     def get_name(self, name):
         self.name = name
