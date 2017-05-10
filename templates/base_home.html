@@ -4,13 +4,13 @@
 {% block content %}
 
     {% if step == 2 %}
-      The upload was {{term}}.<br>
+      The upload was successful.<br>
 The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
     <br><br>
 
 
 
-    <table>
+    <table border="1">
         <tr>
             <td><b>Field</b></td>
             <td><b>Old Value</b></td>
@@ -32,7 +32,7 @@ The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
       Information for <b>{{DSP}}</b> campaign <b>{{id}}</b>:.<br>
     <br><br>
 
-    <table>
+    <table border="1">
         <tr>
             <td>Field</td>
             <td>Value</td>
@@ -54,7 +54,9 @@ The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
         {{ render_field(form.dsp) }}
         {{ render_field(form.campaignID) }}
 
-      <form action="/" method="post"><p><input type=submit value="Get Information">
+
+      <form action="/" method="post"><p><input type=submit id="get-info" value="Get Information">
+      <br><small><i>Note: check all fields are clear (you can use the clear button) before requesting info.</small></i><br>
 
         {{ render_field(form.status) }}
         {{ render_field(form.curbid) }}
@@ -63,7 +65,8 @@ The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
         {{ render_field(form.frequency_cap) }}
 
   </dl>
-  <p><input type=submit value=Update>
+  <p>
 
-<a href="/">Clear</a>
+<input type=reset value=Clear>
+<input type=submit value=Update>
 {% endblock %}

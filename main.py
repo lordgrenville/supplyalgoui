@@ -1,13 +1,8 @@
-# this file takes in the starting arguments for accessing the redis database.
-# it parses them, and creates an object ('args') with these properties
-# it then creates another object, 'myfunc', which is identical except that it also has a printargs function
-# it then starts the flask app (the UI)
 import re
 import argparse
 from flask import *
 from tools.forms import PrimaryForm
 from tools.functionality import Functionality, userInfo, yotamTime
-
 
 # parsing the init arguments for access to the redisDB
 def parsing():
@@ -23,7 +18,6 @@ def parsing():
     parser.add_argument('-lvl', '--log_level', dest="log_level", type=str)
     args = parser.parse_args()
     return args
-
 
 # this method initialises the flask app
 def get_app(myfunc, new_update, config_filename):
@@ -51,24 +45,34 @@ def get_app(myfunc, new_update, config_filename):
 
         # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
 
-        #Es.log try - except
-        old_redis = myfunc.getdoc(new_update.DSP)
-
-        # Es.log try - except
-        new_update.get_name(old_redis['name'][new_update.campaign_id])
+        #Es.log
+        try:
+            old_redis = myfunc.getdoc(new_update.DSP)
+        except SystemExit as m:
+            return render_template("algo_response.html", term=m)
 
         if new_update.campaign_id not in old_redis['status']:
             flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
                   " of your parameters and try again.")
             return render_template("base_home.html", form=form, step=0)
 
+        # Es.log try - except
+        new_update.get_name(old_redis['name'][new_update.campaign_id])
+
+        #store information as a dict
         if all(v == '' for v in options.values()):
             info = {'Name': old_redis['name'][new_update.campaign_id],
                     'Status':old_redis['status'][new_update.campaign_id],
                     'Bid':old_redis['bid'][new_update.campaign_id],
                     'Maximum Bid':old_redis['maxbid'][new_update.campaign_id],
                     'Minimum Bid':old_redis['lowerbid'][new_update.campaign_id],
-                    'Cap':old_redis['frequency_cap'][new_update.campaign_id]}
+                    'Cap': int(old_redis['frequency_cap'][new_update.campaign_id])}
+
+            if info['Status'] == True:
+                info['Status'] = "Active"
+            else:
+                info['Status'] = "Paused"
+
             return render_template("base_home.html", info=info, DSP=new_update.DSP, id=new_update.name, form=form,
                                    step=1, rows=0)
 
@@ -108,11 +112,13 @@ def get_app(myfunc, new_update, config_filename):
             except ValueError:
                     flash("Sorry, the cap you enter must be in integer form, e,g, 3")
                     return render_template("base_home.html", form=form, step=0)
-
+            except:
+                flash("Unknown error")
+                return render_template("base_home.html", form=form, step=0)
         if 'bid' in new_update.updates:
             try:
                 my_bid = float(new_update.updates['bid'])
-                if my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
+                if my_bid > 0 and my_bid <= 20:     #validating not blank, setting min/max
                     old_bid = old_redis['bid'][new_update.campaign_id]
                     new_update.oldvalues['bid'] = old_bid
                     old_redis['bid'][new_update.campaign_id] = my_bid
@@ -127,7 +133,7 @@ def get_app(myfunc, new_update, config_filename):
         if 'lowerbid' in new_update.updates:
             try:
                 my_lowerbid = float(new_update.updates['lowerbid'])
-                if my_lowerbid > 0 and my_lowerbid < 20:  # validating not blank, setting min/max
+                if my_lowerbid > 0 and my_lowerbid <= 20:  # validating not blank, setting min/max
                     old_bid = old_redis['lowerbid'][new_update.campaign_id]
                     new_update.oldvalues['lowerbid'] = old_bid
                     old_redis['lowerbid'][new_update.campaign_id] = my_lowerbid
@@ -169,22 +175,18 @@ def get_app(myfunc, new_update, config_filename):
         #return landing page to user with success/failure message
         try:
             myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
-            return render_template("base_home.html", term="successful", id=new_update.name, DSP=new_update.DSP.title(),
-                                   changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
+            return render_template("base_home.html", id=new_update.name, DSP=new_update.DSP.title(), changes=changes,
+                                   rows=rows, olds=olds, news=news, step=2, form=form)
         except SystemExit as m:
             #ES as log
-            return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
-
-    @app.errorhandler(500)
-    def pageNotFound(error):
-        return render_template("algo_response.html", term=error)
+            return render_template("algo_response.html", term=m)
 
     app.debug = False
     return app
 
 if __name__ == '__main__':
 
-    # create an object on the server and parse the args
+    #instantiate parser
     args = parsing()
 
     crdb = args.crdb
@@ -202,11 +204,11 @@ if __name__ == '__main__':
     timezone = args.timezone
     log_level = args.log_level
 
-    # instantiate two objects
+    # instantiate two objects to store data
     myfunc = Functionality(crdb, drdb, redisindex, redismastername,
                            redisipvec, esippush, esindnpush, timezone, log_level)
-
     new_update = userInfo()
 
+    # instantiate flask app
     app = get_app(myfunc, new_update, "settings")
     app.run()
