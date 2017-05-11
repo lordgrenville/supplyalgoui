@@ -1,50 +1,40 @@
 import re
-import argparse
 from flask import *
 from tools.forms import PrimaryForm
-from tools.functionality import Functionality, userInfo, yotamTime
+from tools.functionality import Functionality, userInfo, yotamTime, parsing, numberChecker
 
-# parsing the init arguments for access to the redisDB
-def parsing():
-    parser = argparse.ArgumentParser(description='run the app')
-    parser.add_argument('-cr', '--crdb', dest="crdb", type=str)
-    parser.add_argument('-dr', '--drdb', dest="drdb", type=str)
-    parser.add_argument('-redind', '--redisindex', dest="redisindex", type=str)
-    parser.add_argument('-redmast', '--redismastername', dest="redismastername", type=str)
-    parser.add_argument('-redip', '--redisipvec', dest="redisipvec", type=str)
-    parser.add_argument('-esip', '--esippush', dest="esippush", type=str)
-    parser.add_argument('-esind', '--esindnpush', dest="esindnpush", type=str)
-    parser.add_argument('-tz', '--timezone', dest="timezone", type=str)
-    parser.add_argument('-lvl', '--log_level', dest="log_level", type=str)
-    args = parser.parse_args()
-    return args
-
-# this method initialises the flask app
+# initialise a flask object, and call the run method. this will start our site!
 def get_app(myfunc, new_update, config_filename):
     app = Flask(__name__)
-    # app.config.from_object(config_filename)
-    app.config['SECRET_KEY'] = 'os.urandom(10)'
 
-    # home view
-    @app.route('/', methods=['GET', 'POST'])
+    # setting a secret key in the config dict - this is needed so that we can flash messages
+    app.secret_key = 'os.urandom(24)'
+
+    #home view
+    @app.route('/')
     def home():
         form = PrimaryForm(request.form)
+        return render_template('base_home.html', form=form, step=0)
 
-        if request.method == 'GET':
-            return render_template('base_home.html', form=form, step=0)
+    #response view - same URL, though
+    @app.route('/', methods=['POST'])
+    def response():
 
+        form = PrimaryForm(request.form)
+
+        #check campaign ID exists
         if form.campaignID.data == '':
             flash('You didn\'t enter a campaign ID!')
             return render_template("base_home.html", form=form, step=0)
 
+        #create a dict to store form information
         options = {'bid':form.curbid.data, 'maxbid':form.maxbid.data, 'lowerbid':form.minbid.data,
                    'frequency_cap':form.frequency_cap.data, 'status':form.status.data}
 
+        #store campaign ID and DSP in a new_update, strip trailing spaces
         new_update.get_info(form.campaignID.data.strip(), form.dsp.data)
-        # adds CID and DSP to new_updates. the .strip() removes trailing spaces
 
         # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
-
         #Es.log
         try:
             old_redis = myfunc.getdoc(new_update.DSP)
@@ -59,7 +49,7 @@ def get_app(myfunc, new_update, config_filename):
         # Es.log try - except
         new_update.get_name(old_redis['name'][new_update.campaign_id])
 
-        #store information as a dict
+        #if there are no updates in the form, get all of the old data and store it in a dict
         if all(v == '' for v in options.values()):
             info = {'Name': old_redis['name'][new_update.campaign_id],
                     'Status':old_redis['status'][new_update.campaign_id],
@@ -68,6 +58,7 @@ def get_app(myfunc, new_update, config_filename):
                     'Minimum Bid':old_redis['lowerbid'][new_update.campaign_id],
                     'Cap': int(old_redis['frequency_cap'][new_update.campaign_id])}
 
+            #change the term for status from true/false to active/paused
             if info['Status'] == True:
                 info['Status'] = "Active"
             else:
@@ -76,12 +67,15 @@ def get_app(myfunc, new_update, config_filename):
             return render_template("base_home.html", info=info, DSP=new_update.DSP, id=new_update.name, form=form,
                                    step=1, rows=0)
 
+        #otherwise, if there ARE updates in the form, add what is there to new_updates
         for x in options.keys():
             if options[x] != '':
                 new_update.updates[x] = options[x]
 
+        #update the userts (timestamp)
         new_time = yotamTime()
 
+        #search for each parameter and update it
         if 'status' in new_update.updates:
             #store the old value
             if old_redis['status'][new_update.campaign_id] == True:
@@ -89,79 +83,64 @@ def get_app(myfunc, new_update, config_filename):
             else:
                 new_update.oldvalues['status'] = "Paused"
 
-            #update the redis over here
+            #update the redis dict
             if new_update.updates['status'] == 'Activated':
                 old_redis['status'][new_update.campaign_id] = True
             else:
                 old_redis['status'][new_update.campaign_id] = False
 
+        #...and so on
         if 'frequency_cap' in new_update.updates:
-            try:
-                my_cap = float(new_update.updates['frequency_cap'])
-                #validate whole number, set max and min
-                if my_cap.is_integer() and my_cap > 0 and my_cap <= 500:
-                    #store the old value
-                    new_update.oldvalues['frequency_cap'] = old_redis['frequency_cap'][new_update.campaign_id]
-                    #update the new value
-                    old_redis['frequency_cap'][new_update.campaign_id] = my_cap
-
-                else:
-                    flash("Sorry, the frequency cap must be a whole number between 0 and 300")
-                    return render_template("base_home.html", form=form, step=0)
-
-            except ValueError:
-                    flash("Sorry, the cap you enter must be in integer form, e,g, 3")
-                    return render_template("base_home.html", form=form, step=0)
-            except:
-                flash("Unknown error")
+            if numberChecker(new_update.updates['frequency_cap'],0,500) == "good":
+                new_update.oldvalues['frequency_cap'] = old_redis['frequency_cap'][new_update.campaign_id]
+                old_redis['frequency_cap'][new_update.campaign_id] = new_update.updates['frequency_cap']
+            elif numberChecker(new_update.updates['frequency_cap'],0,500) == "bad size":
+                flash("Sorry, the frequency cap must be a whole number between 0 and 300")
                 return render_template("base_home.html", form=form, step=0)
-        if 'bid' in new_update.updates:
-            try:
-                my_bid = float(new_update.updates['bid'])
-                if my_bid > 0 and my_bid <= 20:     #validating not blank, setting min/max
-                    old_bid = old_redis['bid'][new_update.campaign_id]
-                    new_update.oldvalues['bid'] = old_bid
-                    old_redis['bid'][new_update.campaign_id] = my_bid
-                else:
-                    flash("Sorry, your bid must be between 0 and 20.")
-                    return render_template("base_home.html", form=form, step=0)
+            else:
+                flash("Unknown error. check your frequency cap is a number, e.g. 3")
+                return render_template("base_home.html", form=form, step=0)
 
-            except ValueError:
+        if 'bid' in new_update.updates:
+            if numberChecker(new_update.updates['bid'],0,20) == "good":
+                old_bid = old_redis['bid'][new_update.campaign_id]
+                new_update.oldvalues['bid'] = old_bid
+                old_redis['bid'][new_update.campaign_id] = new_update.updates['bid']
+            elif numberChecker(new_update.updates['bid'],0,20) == "bad size":
+                flash("Sorry, your bid must be between 0 and 20.")
+                return render_template("base_home.html", form=form, step=0)
+            else:
                 flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                 return render_template("base_home.html", form=form, step=0)
 
         if 'lowerbid' in new_update.updates:
-            try:
-                my_lowerbid = float(new_update.updates['lowerbid'])
-                if my_lowerbid > 0 and my_lowerbid <= 20:  # validating not blank, setting min/max
-                    old_bid = old_redis['lowerbid'][new_update.campaign_id]
-                    new_update.oldvalues['lowerbid'] = old_bid
-                    old_redis['lowerbid'][new_update.campaign_id] = my_lowerbid
-                else:
-                    flash("Sorry, your bid must be between 0 and 20.")
-                    return render_template("base_home.html", form=form, step=0)
-
-            except ValueError:
+            if numberChecker(new_update.updates['lowerbid'],0,20) == "good":
+                old_bid = old_redis['lowerbid'][new_update.campaign_id]
+                new_update.oldvalues['lowerbid'] = old_bid
+                old_redis['lowerbid'][new_update.campaign_id] = new_update.updates['lowerbid']
+            elif numberChecker(new_update.updates['lowerbid'],0,20) == "bad size":
+                flash("Sorry, your bid must be between 0 and 20.")
+                return render_template("base_home.html", form=form, step=0)
+            else:
                 flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                 return render_template("base_home.html", form=form, step=0)
 
         if 'maxbid' in new_update.updates:
-            try:
-                my_maxbid = float(new_update.updates['maxbid'])
-                if my_maxbid > 0 and my_maxbid <= 20:  # validating not blank, setting min/max
-                    old_bid = old_redis['maxbid'][new_update.campaign_id]
-                    new_update.oldvalues['maxbid'] = old_bid
-                    old_redis['maxbid'][new_update.campaign_id] = my_maxbid
-                else:
-                    flash("Sorry, your bid must be between 0 and 20.")
-                    return render_template("base_home.html", form=form, step=0)
-
-            except ValueError:
+            if numberChecker(new_update.updates['maxbid'],0,20) == "good":
+                old_bid = old_redis['maxbid'][new_update.campaign_id]
+                new_update.oldvalues['maxbid'] = old_bid
+                old_redis['maxbid'][new_update.campaign_id] = new_update.updates['maxbid']
+            elif numberChecker(new_update.updates['maxbid'],0,20) == "bad size":
+                flash("Sorry, your bid must be between 0 and 20.")
+                return render_template("base_home.html", form=form, step=0)
+            else:
                 flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
                 return render_template("base_home.html", form=form, step=0)
+
         # update time
         old_redis['useruts'][new_update.campaign_id] = new_time
 
+        #save info for old and new values in dicts to display to the user
         changes = []
         olds = []
         news = []
@@ -179,7 +158,10 @@ def get_app(myfunc, new_update, config_filename):
                                    rows=rows, olds=olds, news=news, step=2, form=form)
         except SystemExit as m:
             #ES as log
-            return render_template("algo_response.html", term=m)
+            return render_template("algo_response.html")
+
+        #if nothing else, return 404 error
+        abort(404)
 
     app.debug = False
     return app
