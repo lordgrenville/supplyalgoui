@@ -34,8 +34,8 @@ The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
 
     <table border="1">
         <tr>
-            <td>Field</td>
-            <td>Value</td>
+            <td><b>Field</b></td>
+            <td><b>Value</b></td>
         </tr>
         {% for key, value in info.items() %}
         <tr>
@@ -50,23 +50,33 @@ The following changes have been made in <b>{{DSP}}</b> campaign <b>{{id}}</b>:
 
 <form action="/" method="post">
   <dl>
-
-        {{ render_field(form.dsp) }}
-        {{ render_field(form.campaignID) }}
-
-
-      <form action="/" method="post"><p><input type=submit id="get-info" value="Get Information">
-      <br><small><i>Note: check all fields are clear (you can use the clear button) before requesting info.</small></i><br>
-
-        {{ render_field(form.status) }}
-        {{ render_field(form.curbid) }}
-        {{ render_field(form.maxbid) }}
-        {{ render_field(form.minbid) }}
-        {{ render_field(form.frequency_cap) }}
+        DSP
+        {{ form.dsp }}<br><br>
+      Campaign ID
+        {{ form.campaignID }}
+      <br><br>
+        {{ form.get_info }}
+      <br><br>
+      Status
+        {{ form.status }}
+      <br><br>
+      Current Bid
+        {{ form.curbid }}
+      <br><br>
+      Maximum Bid
+        {{ form.maxbid }}
+      <br><br>
+      Minimum Bid
+        {{ form.minbid }}
+      <br><br>
+      Frequency Cap
+        {{ form.frequency_cap }}
+      <br><br>
 
   </dl>
   <p>
+<a class="btn btn-default" href="/" role="button">Clear All</a>
+   {{ form.update }}
+  </form>
 
-<input type=reset value=Clear>
-<input type=submit value=Update>
 {% endblock %}
