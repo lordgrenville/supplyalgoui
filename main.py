@@ -1,190 +1,108 @@
-# this file takes in the starting arguments for accessing the redis database.
-# it parses them, and creates an object ('args') with these properties
-# it then creates another object, 'myfunc', which is identical except that it also has a printargs function
-# it then starts the flask app (the UI)
 import re
-import argparse
 from flask import *
-from tools.forms import PrimaryForm, BidForm, CapForm, StatusForm
-from tools.functionality import Functionality, userInfo, yotamTime
-from redis.exceptions import *
+from tools.forms import PrimaryForm
+from tools.functionality import Functionality, yotamTime, information, parsing, update_algo, summary
 
 
-# parsing the init arguments for access to the redisDB
-def parsing():
-    parser = argparse.ArgumentParser(description='run the app')
-    parser.add_argument('-cr', '--crdb', dest="crdb", type=str)
-    parser.add_argument('-dr', '--drdb', dest="drdb", type=str)
-    parser.add_argument('-redind', '--redisindex', dest="redisindex", type=str)
-    parser.add_argument('-redmast', '--redismastername', dest="redismastername", type=str)
-    parser.add_argument('-redip', '--redisipvec', dest="redisipvec", type=str)
-    parser.add_argument('-esip', '--esippush', dest="esippush", type=str)
-    parser.add_argument('-esind', '--esindnpush', dest="esindnpush", type=str)
-    parser.add_argument('-tz', '--timezone', dest="timezone", type=str)
-    parser.add_argument('-lvl', '--log_level', dest="log_level", type=str)
-    args = parser.parse_args()
-    return args
-
-
-# this method initialises the flask app
-def get_app(myfunc, new_update, config_filename):
+# initialise a flask object, and call the run method. this will start our site!
+def get_app(myfunc):
     app = Flask(__name__)
-    # app.config.from_object(config_filename)
-    app.config['SECRET_KEY'] = 'os.urandom(10)'
+    # setting a secret key in the config dict - this is needed so that we can flash messages
+    app.secret_key = 'os.urandom(24)'
 
-    # home view
-    @app.route('/', methods=['GET', 'POST'])
+    # handle crash in rendering page - this way the app won't crash if one page does
+    def rendering(html,**kwargs):
+        try:
+            return render_template(html,**kwargs)
+        except SystemExit:
+            abort(404)
+
+    # generic error handling
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('algo_fail_response.html'), 404
+
+    @app.route('/', methods=['GET'])
     def home():
         form = PrimaryForm(request.form)
+        return rendering('base_home.html', form=form, step=0)
 
-        if not request.method == 'POST':
-            return render_template('base_home.html', form=form, step=0)
+    @app.route('/', methods=['POST'])
+    def check_for_campaign():
+        form = PrimaryForm(request.form)
 
-        else:  # if method == POST
-            if len(request.form) == 3:  # if this is the first round
+        # check campaign ID exists
+        if form.campaignID.data == '':
+            flash('You didn\'t enter a campaign ID!')
+            return rendering("base_home.html", form=form, step=0)
 
-                if form.validate():
-                    choice_name = dict(form.choice.choices).get(form.choice.data)
-                    new_update.get_info(form.campaignID.data.strip(), form.dsp.data, form.choice.data, choice_name)
-                    # the .strip() removes trailing spaces
-                    myfunc.printargs(new_update.campaign_id)
-                    myfunc.printargs(new_update.choice)
-                    myfunc.printargs(new_update.DSP)
+        else:
+            return check_in_redis(form)
 
-                    message = Markup('Attempting to update the %s for %s Campaign: <b>%s</b>') % \
-                              (choice_name, new_update.DSP.title(), new_update.campaign_id)
-                    flash(message)
+    @app.route('/', methods=['POST'])
+    def check_in_redis(form):
 
-                    if new_update.choice == "status":
-                        form2 = StatusForm(request.form)
-                        choice = form2.status
-                    elif new_update.choice == "frequency_cap":
-                        form2 = CapForm(request.form)
-                        choice = form2.frequency_cap
-                    else:
-                        form2 = BidForm(request.form)
-                        choice = form2.bid
-                    return render_template('base_home.html', choice=choice, step=1)
+        # store campaign ID and DSP in session, strip trailing spaces
+        session['campaign_id'] = form.campaignID.data.strip()
+        session['dsp'] = form.dsp.data
 
-                else:
-                    flash('There was an issue with your input. Please try again.')
-                    return render_template("base_home.html", form=form, step=0)
+        # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
+        try:
+            old_redis = myfunc.getdoc(session['dsp'])
+        except SystemExit as m:
+            return rendering("algo_fail_response.html", error=m)
 
-            else:
-                # we need to search old_redis for the correct dict, and then the correct campaign_id, and then alter it
-                old_redis = myfunc.getdoc(new_update.DSP)
-                data = request.form.to_dict()
+        if session['campaign_id'] not in old_redis['status']:
+            flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
+                  " of your parameters and try again.")
+            return rendering("base_home.html", form=form, step=0)
 
-                if new_update.campaign_id not in old_redis[new_update.choice]:
-                    flash("It looks like the campaign you're trying to update isn't in the algorithm. Please check all"
-                          " of your parameters and try again.")
-                    return render_template("base_home.html", form=form, step=0)
+        else:
+            return get_info(form, old_redis)
 
-                else:
-                    new_time = yotamTime()
+    @app.route('/', methods=['POST'])
+    def get_info(form, old_redis):
+        try:
+            session['name'] = old_redis['name'][session['campaign_id']]
+        except SystemExit as m:
+            return rendering("algo_fail_response.html", error=m)
 
-                    if new_update.choice == 'status':
+        if form.get_info.data:
+            # if 'update' selected, get all of the old data and store it in a dict
+            info = information(old_redis,session['campaign_id'])
+            return rendering("base_home.html",info=info,DSP=session['dsp'],id=session['name'],form=form,step=1, rows=0)
 
-                        #store the old value
-                        my_status = data['status']
-                        if old_redis['status'][new_update.campaign_id] == True:
-                            old_status = "Activated"
-                        else:
-                            old_status = "Paused"
-                        new_update.get_oldvalue(old_status)
+        # else if request.form['submit'] is 'update', create a dict to store form information
+        elif form.update.data:
+            return update(form, old_redis)
 
-                        #update the redis over here
-                        if my_status == 'Activated':
-                            new_update.get_number(True)
-                            old_redis['status'][new_update.campaign_id] = True
-                        else:
-                            new_update.get_number(False)
-                            old_redis['status'][new_update.campaign_id] = False
+    @app.route('/', methods=['POST'])
+    def update(form, old_redis):
+        old_redis, updates, values, message =  update_algo(old_redis, session, form.curbid.data, form.maxbid.data,
+                                                    form.minbid.data, form.frequency_cap.data, form.status.data)
 
-                        #update time
-                        old_redis['useruts'][new_update.campaign_id] = new_time
+        # if this returns a non-blank message, flash it and go back. otherwise go on!
+        if len(message) > 0:
+            flash(message)
+            result = rendering('base_home.html', form=form, step=0)
 
-                    elif new_update.choice == 'frequency_cap':
-                        try:
-                            my_cap = float(data['frequency_cap'])
+        else:
+            # update the userts (timestamp)
+            new_time = yotamTime()
+            old_redis['useruts'][session['campaign_id']] = new_time
 
-                            #validate not blank, whole number, set max and min
-                            if data['frequency_cap'] and my_cap.is_integer() and my_cap > 0 and my_cap < 500:
-                                new_update.get_number(my_cap)
-                                #store the old value
-                                old_cap = old_redis['frequency_cap'][new_update.campaign_id]
-                                new_update.get_oldvalue(old_cap)
+            # save info for old and new values in dicts to display to the user
+            olds, news, changes, rows= summary(updates, values)
 
-                                #update the new value
-                                old_redis['frequency_cap'][new_update.campaign_id] = new_update.bid
-                                old_redis['useruts'][new_update.campaign_id] = new_time
+            # return landing page to user with success/failure message
+            try:
+                myfunc.mr.set_doc_by_dsp(session['dsp'], old_redis)
+                result = rendering("base_home.html", id=session['name'], DSP=session['dsp'].title(),
+                                       changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
+            except SystemExit as m:
+                result = rendering("algo_fail_response.html", error=m)
 
-                            else:
-                                form2 = CapForm(request.form)
-                                choice = form2.frequency_cap
-                                flash("Sorry, the frequency cap must be a whole number between 0 and 300")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                            #recreate the bid form
-                        except ValueError:
-                                form2 = CapForm(request.form)
-                                choice = form2.frequency_cap
-                                flash("Sorry, the cap you enter must be in integer form, e,g, 3")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                    else:
-                        try:
-                            my_bid = float(data['bid'])
-                            if data['bid'] and my_bid > 0 and my_bid < 20:     #validating not blank, setting min/max
-                                old_bid = old_redis[new_update.choice][new_update.campaign_id]
-                                new_update.get_oldvalue(old_bid)
-
-                                if new_update.choice == 'lowerbid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                elif new_update.choice == 'maxbid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                elif new_update.choice == 'bid':
-                                    new_update.get_number(my_bid)
-                                    old_redis[new_update.choice][new_update.campaign_id] = new_update.bid
-
-                                old_redis['useruts'][new_update.campaign_id] = new_time
-
-                            else:
-                                form2 = BidForm(request.form)
-                                choice = form2.bid
-                                flash("Sorry, are you sure you entered a bid? It must be between 0 and 20.")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                        except ValueError:
-                                form2 = BidForm(request.form)
-                                choice=form2.bid
-                                flash("Sorry, the bid you enter must be in currency form, e,g, 3.45")
-                                return render_template("base_home.html", choice=choice, step=1)
-
-                    #update the redis
-                    reply_value = old_redis[new_update.choice][new_update.campaign_id]
-
-                    #update some terms for user message
-                    new_update.get_name(old_redis['name'][new_update.campaign_id])
-                    if new_update.choice == 'status':
-                        if new_update.bid == False:
-                            reply_value = 'Paused'
-                        else:
-                            reply_value = 'Activated'
-
-                    try:
-                        myfunc.mr.set_doc_by_dsp(new_update.DSP,old_redis)
-                        form = PrimaryForm(request.form)
-                        return render_template("base_home.html", term="successful", choice=new_update.choicename,
-                                               id=new_update.name, oldbid=new_update.oldvalue, bid=reply_value,
-                                               DSP=new_update.DSP, step=2, form=form)
-                    except (ConnectionError,ResponseError,TimeoutError,WatchError,InvalidResponse) as m:
-                        return render_template("algo_response.html", term=m, dog="/static/images/sad-dog.jpg")
-
+        return result
 
     app.debug = False
     return app
@@ -192,7 +110,7 @@ def get_app(myfunc, new_update, config_filename):
 
 if __name__ == '__main__':
 
-    # create an object on the server and parse the args
+    # instantiate parser
     args = parsing()
 
     crdb = args.crdb
@@ -210,11 +128,11 @@ if __name__ == '__main__':
     timezone = args.timezone
     log_level = args.log_level
 
-    # instantiate two objects
+    # instantiate a class called myfunc to store stuff
     myfunc = Functionality(crdb, drdb, redisindex, redismastername,
                            redisipvec, esippush, esindnpush, timezone, log_level)
-
-    new_update = userInfo()
-
-    app = get_app(myfunc, new_update, "settings")
-    app.run()
+    try:
+        app = get_app(myfunc)
+        app.run(debug=True, use_debugger=False, use_reloader=False)
+    except:
+        pass
