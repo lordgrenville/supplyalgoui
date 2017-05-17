@@ -22,17 +22,25 @@ def get_app(myfunc):
     def page_not_found(e):
         return render_template('algo_fail_response.html'), 404
 
-    @app.route('/', methods=['GET','POST'])
+    @app.route('/', methods=['GET'])
     def home():
-
         form = PrimaryForm(request.form)
-        if request.method == 'GET':
-            return rendering('base_home.html', form=form, step=0)
+        return rendering('base_home.html', form=form, step=0)
+
+    @app.route('/', methods=['POST'])
+    def check_for_campaign():
+        form = PrimaryForm(request.form)
 
         # check campaign ID exists
         if form.campaignID.data == '':
             flash('You didn\'t enter a campaign ID!')
             return rendering("base_home.html", form=form, step=0)
+
+        else:
+            return check_in_redis(form)
+
+    @app.route('/', methods=['POST'])
+    def check_in_redis(form):
 
         # store campaign ID and DSP in session, strip trailing spaces
         session['campaign_id'] = form.campaignID.data.strip()
@@ -49,42 +57,52 @@ def get_app(myfunc):
                   " of your parameters and try again.")
             return rendering("base_home.html", form=form, step=0)
 
+        else:
+            return get_info(form, old_redis)
+
+    @app.route('/', methods=['POST'])
+    def get_info(form, old_redis):
         try:
             session['name'] = old_redis['name'][session['campaign_id']]
-        except SystemExit:
-            return rendering("algo_fail_response.html")
+        except SystemExit as m:
+            return rendering("algo_fail_response.html", error=m)
 
         if form.get_info.data:
             # if 'update' selected, get all of the old data and store it in a dict
             info = information(old_redis,session['campaign_id'])
-            return rendering("base_home.html", info=info, DSP=session['dsp'], id=session['name'], form=form,
-                                   step=1, rows=0)
+            return rendering("base_home.html",info=info,DSP=session['dsp'],id=session['name'],form=form,step=1, rows=0)
 
         # else if request.form['submit'] is 'update', create a dict to store form information
         elif form.update.data:
-            old_redis, updates, values, message =  update_algo(old_redis, session, form.curbid.data, form.maxbid.data,
-                            form.minbid.data, form.frequency_cap.data, form.status.data)
+            return update(form, old_redis)
 
-            # if this returns a message, not a tuple, flash it and go back
-            if len(message) > 0:
-                flash(message)
-                return rendering('base_home.html', form=form, step=0)
+    @app.route('/', methods=['POST'])
+    def update(form, old_redis):
+        old_redis, updates, values, message =  update_algo(old_redis, session, form.curbid.data, form.maxbid.data,
+                                                    form.minbid.data, form.frequency_cap.data, form.status.data)
 
-            else:
-                # update the userts (timestamp)
-                new_time = yotamTime()
-                old_redis['useruts'][session['campaign_id']] = new_time
+        # if this returns a non-blank message, flash it and go back. otherwise go on!
+        if len(message) > 0:
+            flash(message)
+            result = rendering('base_home.html', form=form, step=0)
 
-                # save info for old and new values in dicts to display to the user
-                olds, news, changes, rows= summary(updates, values)
+        else:
+            # update the userts (timestamp)
+            new_time = yotamTime()
+            old_redis['useruts'][session['campaign_id']] = new_time
 
-                # return landing page to user with success/failure message
-                try:
-                    myfunc.mr.set_doc_by_dsp(session['dsp'], old_redis)
-                    return rendering("base_home.html", id=session['name'], DSP=session['dsp'].title(),
-                                           changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
-                except SystemExit as m:
-                    return rendering("algo_fail_response.html")
+            # save info for old and new values in dicts to display to the user
+            olds, news, changes, rows= summary(updates, values)
+
+            # return landing page to user with success/failure message
+            try:
+                myfunc.mr.set_doc_by_dsp(session['dsp'], old_redis)
+                result = rendering("base_home.html", id=session['name'], DSP=session['dsp'].title(),
+                                       changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
+            except SystemExit as m:
+                result = rendering("algo_fail_response.html", error=m)
+
+        return result
 
     app.debug = False
     return app
