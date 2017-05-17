@@ -87,6 +87,7 @@ def update_algo(old_redis,session,curbid, maxbid, minbid, frequency_cap,status):
     options = {'bid': curbid, 'maxbid': maxbid, 'lowerbid': minbid, 'frequency_cap': frequency_cap, 'status': status}
     updates = {}
     oldvalues = {}
+    message = ''
     
     # add form info to new_updates
     for x in options.keys():
@@ -114,10 +115,8 @@ def update_algo(old_redis,session,curbid, maxbid, minbid, frequency_cap,status):
             old_redis['frequency_cap'][session['campaign_id']] = updates['frequency_cap']
         elif numberChecker(updates['frequency_cap'], 0, 500) == "bad size":
             message = "Sorry, the frequency cap must be a whole number between 0 and 300"
-            return message
         else:
             message = "Unknown error. check your frequency cap is a number, e.g. 3"
-            return message
 
     if 'bid' in updates:
         if numberChecker(updates['bid'], 0, 20) == "good":
@@ -126,10 +125,8 @@ def update_algo(old_redis,session,curbid, maxbid, minbid, frequency_cap,status):
             old_redis['bid'][session['campaign_id']] = updates['bid']
         elif numberChecker(updates['bid'], 0, 20) == "bad size":
             message = "Sorry, your bid must be between 0 and 20."
-            return message
         else:
            message = "Sorry, the bid you enter must be in currency form, e,g, 3.45"
-           return message
 
     if 'lowerbid' in updates:
         if numberChecker(updates['lowerbid'], 0, 20) == "good":
@@ -138,10 +135,10 @@ def update_algo(old_redis,session,curbid, maxbid, minbid, frequency_cap,status):
             old_redis['lowerbid'][session['campaign_id']] = updates['lowerbid']
         elif numberChecker(updates['lowerbid'], 0, 20) == "bad size":
             message = "Sorry, your bid must be between 0 and 20."
-            return message
+
         else:
             message = "Sorry, the bid you enter must be in currency form, e,g, 3.45"
-            return message
+
 
     if 'maxbid' in updates:
         if numberChecker(updates['maxbid'], 0, 20) == "good":
@@ -150,12 +147,10 @@ def update_algo(old_redis,session,curbid, maxbid, minbid, frequency_cap,status):
             old_redis['maxbid'][session['campaign_id']] = updates['maxbid']
         elif numberChecker(updates['maxbid'], 0, 20) == "bad size":
             message = "Sorry, your bid must be between 0 and 20."
-            return message
         else:
             message = "Sorry, the bid you enter must be in currency form, e,g, 3.45"
-            return message
 
-    return old_redis, updates, oldvalues
+    return old_redis, updates, oldvalues, message
 
 def summary(updates, oldvalues):
     changes = []
