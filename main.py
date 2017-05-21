@@ -2,10 +2,11 @@ import re
 from flask import *
 from tools.forms import PrimaryForm
 from tools.functionality import Functionality, yotamTime, information, parsing, update_algo, summary
+from tools.eslog.eslog import ESlog
 
 
 # initialise a flask object, and call the run method. this will start our site!
-def get_app(myfunc):
+def get_app(myfunc,ESlog):
     app = Flask(__name__)
     # setting a secret key in the config dict - this is needed so that we can flash messages
     app.secret_key = 'os.urandom(24)'
@@ -14,7 +15,17 @@ def get_app(myfunc):
     def rendering(html,**kwargs):
         try:
             return render_template(html,**kwargs)
-        except SystemExit:
+        except SystemExit as m:
+            try:
+                e = (session['dsp'])
+            except KeyError or NameError:
+                e = 'Unknown'
+            ESlog.lerror({
+                    'project':'supplyalgoui',
+                    'message':m,
+                    'event_code':300,
+                    'dsp_name':e
+                })
             abort(404)
 
     # generic error handling
@@ -50,6 +61,12 @@ def get_app(myfunc):
         try:
             old_redis = myfunc.getdoc(session['dsp'])
         except SystemExit as m:
+            ESlog.lerror({
+                    'project':'supplyalgoui',
+                    'message':m,
+                    'event_code':300,
+                    'dsp_name':session['dsp']
+                })
             return rendering("algo_fail_response.html", error=m)
 
         if session['campaign_id'] not in old_redis['status']:
@@ -65,6 +82,12 @@ def get_app(myfunc):
         try:
             session['name'] = old_redis['name'][session['campaign_id']]
         except SystemExit as m:
+            ESlog.lerror({
+                    'project':'supplyalgoui',
+                    'message':m,
+                    'event_code':300,
+                    'dsp_name':session['dsp']
+                })
             return rendering("algo_fail_response.html", error=m)
 
         if form.get_info.data:
@@ -74,6 +97,13 @@ def get_app(myfunc):
 
         # else if request.form['submit'] is 'update', create a dict to store form information
         elif form.update.data:
+            msg = 'User requested info for campaign %s in DSP %s.' (session['campaign_id'],session['dsp'])
+            ESlog.linfo({
+                    'project':'supplyalgoui',
+                    'message':msg,
+                    'event_code':600,
+                    'dsp_name':session['dsp']
+                })
             return update(form, old_redis)
 
     @app.route('/', methods=['POST'])
@@ -100,8 +130,21 @@ def get_app(myfunc):
                 result = rendering("base_home.html", id=session['name'], DSP=session['dsp'].title(),
                                        changes=changes, rows=rows, olds=olds, news=news, step=2, form=form)
             except SystemExit as m:
+                ESlog.lerror({
+                    'project':'supplyalgoui',
+                    'message':m,
+                    'event_code':300,
+                    'dsp_name':session['dsp']
+                })
                 result = rendering("algo_fail_response.html", error=m)
 
+        msg = 'User updated info in campaign %s in DSP %s.' (session['campaign_id'],session['dsp'])
+        ESlog.lerror({
+                    'project':'supplyalgoui',
+                    'message':msg,
+                    'event_code':600,
+                    'dsp_name':session['dsp']
+                })
         return result
 
     app.debug = False
@@ -128,11 +171,15 @@ if __name__ == '__main__':
     timezone = args.timezone
     log_level = args.log_level
 
+    # instantiate ESlog to track errors, warnings and other info
+    ESipvec = re.split(",", '10.0.63.7,10.0.64.154')
+    eslogger = ESlog(ESipvec,'PM','UTC')
+
     # instantiate a class called myfunc to store stuff
     myfunc = Functionality(crdb, drdb, redisindex, redismastername,
                            redisipvec, esippush, esindnpush, timezone, log_level)
     try:
-        app = get_app(myfunc)
+        app = get_app(myfunc, ESlog)
         app.run(debug=True, use_debugger=False, use_reloader=False)
     except:
         pass
