@@ -41,7 +41,7 @@ def get_app(myfunc, es_log):
 
     # generic error handling
     @app.errorhandler(404)
-    def page_not_found():
+    def page_not_found(e):
         return render_template('algo_fail_response.html'), 404
 
     @app.route('/', methods=['GET'])
